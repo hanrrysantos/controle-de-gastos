@@ -69,7 +69,7 @@ O projeto segue o padrão em camadas (**Layered Architecture**) para garantir de
 
 ### 1. Clone o repositório
 ```bash
-git clone [https://github.com/seu-usuario/controle-de-gastos.git](https://github.com/seu-usuario/controle-de-gastos.git)
+git clone [https://github.com/seu-usuario/controle-de-gastos.git]
 cd controle-de-gastos
 ```
 
