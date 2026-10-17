@@ -1,6 +1,7 @@
 package hanrry.cdg.services;
 
 import hanrry.cdg.dtos.DashboardResponseDTO;
+import hanrry.cdg.dtos.ResumoMensalResponseDTO;
 import hanrry.cdg.dtos.TransacaoRequestDTO;
 import hanrry.cdg.dtos.TransacaoResponseDTO;
 import hanrry.cdg.exceptions.AccessDeniedException;
@@ -12,14 +13,22 @@ import hanrry.cdg.models.TipoTransacao;
 import hanrry.cdg.models.Transacao;
 import hanrry.cdg.models.User;
 import hanrry.cdg.repositories.CategoriaRepository;
+import hanrry.cdg.repositories.TotalPorCategoria;
 import hanrry.cdg.repositories.TransacaoRepository;
 import hanrry.cdg.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Transactional
@@ -93,6 +102,51 @@ public class TransacaoService {
         BigDecimal saldo = totalReceitas.subtract(totalDespesas);
 
         return new DashboardResponseDTO(totalReceitas, totalDespesas, saldo);
+    }
+
+    public ResumoMensalResponseDTO getResumoMensal(String mes) {
+        YearMonth periodo;
+        try {
+            periodo = mes == null || mes.isBlank() ? YearMonth.now() : YearMonth.parse(mes);
+        } catch (DateTimeParseException e) {
+            throw new BusinessRuleException("Informe o mês no formato AAAA-MM.");
+        }
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        LocalDate inicio = periodo.atDay(1);
+        LocalDate fim = periodo.atEndOfMonth();
+        YearMonth anterior = periodo.minusMonths(1);
+
+        BigDecimal receitas = centavos(repository.totalPorTipo(userId, TipoTransacao.RECEITA, inicio, fim));
+        BigDecimal despesas = centavos(repository.totalPorTipo(userId, TipoTransacao.DESPESA, inicio, fim));
+        BigDecimal saldoAcumulado = centavos(repository.totalPorTipo(userId, TipoTransacao.RECEITA)
+                .subtract(repository.totalPorTipo(userId, TipoTransacao.DESPESA)));
+
+        Map<Long, TotalPorCategoria> totais = repository.totalPorCategoria(userId, inicio, fim).stream()
+                .collect(Collectors.toMap(TotalPorCategoria::categoriaId, Function.identity()));
+        List<ResumoMensalResponseDTO.Categoria> categorias = categoriaRepository.findByUserId(userId).stream()
+                .map(categoria -> {
+                    TotalPorCategoria total = totais.get(categoria.getId());
+                    return new ResumoMensalResponseDTO.Categoria(categoria.getId(), categoria.getNome(), categoria.getTipo(),
+                            centavos(total == null ? BigDecimal.ZERO : total.total()), total == null ? 0 : total.quantidade());
+                })
+                .sorted(Comparator.comparing(ResumoMensalResponseDTO.Categoria::total).reversed()
+                        .thenComparing(ResumoMensalResponseDTO.Categoria::nome, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        return new ResumoMensalResponseDTO(
+                periodo.toString(),
+                receitas,
+                despesas,
+                receitas.subtract(despesas),
+                centavos(repository.totalPorTipo(userId, TipoTransacao.RECEITA, anterior.atDay(1), anterior.atEndOfMonth())),
+                centavos(repository.totalPorTipo(userId, TipoTransacao.DESPESA, anterior.atDay(1), anterior.atEndOfMonth())),
+                saldoAcumulado,
+                totais.values().stream().mapToLong(TotalPorCategoria::quantidade).sum(),
+                categorias);
+    }
+
+    private static BigDecimal centavos(BigDecimal valor) {
+        return valor.setScale(2, RoundingMode.UNNECESSARY);
     }
 
     public void deletar(Long id) {

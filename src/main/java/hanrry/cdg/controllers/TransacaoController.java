@@ -1,6 +1,7 @@
 package hanrry.cdg.controllers;
 
 import hanrry.cdg.dtos.DashboardResponseDTO;
+import hanrry.cdg.dtos.ResumoMensalResponseDTO;
 import hanrry.cdg.dtos.TransacaoRequestDTO;
 import hanrry.cdg.dtos.TransacaoResponseDTO;
 import hanrry.cdg.services.TransacaoService;
@@ -36,6 +37,11 @@ public class TransacaoController {
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardResponseDTO> getDashboard() {
         return ResponseEntity.ok(service.getDashboard());
+    }
+
+    @GetMapping("/resumo")
+    public ResponseEntity<ResumoMensalResponseDTO> getResumoMensal(@RequestParam(required = false) String mes) {
+        return ResponseEntity.ok(service.getResumoMensal(mes));
     }
 
     @DeleteMapping("/{id}")
