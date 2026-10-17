@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -19,6 +20,10 @@ public class User implements Serializable {
     @Column(unique = true)
     private String email;
     private String senha;
+    @Column(unique = true)
+    private Long telegramUserId;
+    private String telegramLinkTokenHash;
+    private Instant telegramLinkExpiresAt;
 
     @JsonIgnore
     @OneToMany(mappedBy = "user")
@@ -62,6 +67,15 @@ public class User implements Serializable {
     public void setSenha(String senha) {
         this.senha = senha;
     }
+
+    public Long getTelegramUserId() { return telegramUserId; }
+    public void setTelegramUserId(Long telegramUserId) { this.telegramUserId = telegramUserId; }
+
+    public String getTelegramLinkTokenHash() { return telegramLinkTokenHash; }
+    public void setTelegramLinkTokenHash(String telegramLinkTokenHash) { this.telegramLinkTokenHash = telegramLinkTokenHash; }
+
+    public Instant getTelegramLinkExpiresAt() { return telegramLinkExpiresAt; }
+    public void setTelegramLinkExpiresAt(Instant telegramLinkExpiresAt) { this.telegramLinkExpiresAt = telegramLinkExpiresAt; }
 
     public List<Transacao> getTransacoes() {
         return transacoes;

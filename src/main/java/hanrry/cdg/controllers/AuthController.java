@@ -1,10 +1,13 @@
 package hanrry.cdg.controllers;
 
 import hanrry.cdg.dtos.LoginResponseDTO;
+import hanrry.cdg.dtos.TelegramWebAppLoginDTO;
 import hanrry.cdg.dtos.UserLoginDTO;
 import hanrry.cdg.dtos.UserRegisterDTO;
 import hanrry.cdg.dtos.UserResponseDTO;
 import hanrry.cdg.models.User;
+import hanrry.cdg.repositories.UserRepository;
+import hanrry.cdg.services.TelegramLinkService;
 import hanrry.cdg.services.TokenService;
 import hanrry.cdg.services.UserService;
 import org.springframework.http.ResponseEntity;
@@ -26,11 +29,16 @@ public class AuthController {
     private final UserService userService;
     private final TokenService tokenService;
     private final AuthenticationManager authenticationManager; // <--- Injetamos o gerente
+    private final TelegramLinkService telegramLinkService;
+    private final UserRepository userRepository;
 
-    public AuthController(UserService userService, TokenService tokenService, AuthenticationManager authenticationManager) {
+    public AuthController(UserService userService, TokenService tokenService, AuthenticationManager authenticationManager,
+                          TelegramLinkService telegramLinkService, UserRepository userRepository) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.authenticationManager = authenticationManager;
+        this.telegramLinkService = telegramLinkService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
@@ -47,11 +55,15 @@ public class AuthController {
 
         var user = (org.springframework.security.core.userdetails.User) auth.getPrincipal();
 
-        User userModel = new User();
-        userModel.setEmail(user.getUsername());
+        User usuario = userRepository.findByEmail(user.getUsername()).orElseThrow();
+        var token = tokenService.generateToken(usuario);
 
-        var token = tokenService.generateToken(userModel);
+        return ResponseEntity.ok(new LoginResponseDTO(token, usuario.getNome()));
+    }
 
-        return ResponseEntity.ok(new LoginResponseDTO(token));
+    @PostMapping("/telegram/webapp")
+    public ResponseEntity<LoginResponseDTO> autenticarTelegramWebApp(@RequestBody TelegramWebAppLoginDTO dto) {
+        User user = telegramLinkService.autenticarMiniApp(dto.initData());
+        return ResponseEntity.ok(new LoginResponseDTO(tokenService.generateToken(user), user.getNome()));
     }
 }

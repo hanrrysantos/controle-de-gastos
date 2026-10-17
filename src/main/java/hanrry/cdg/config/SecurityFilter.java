@@ -33,24 +33,23 @@ public class SecurityFilter extends OncePerRequestFilter {
             var login = tokenService.validateToken(token);
 
             if (login != null && !login.isEmpty()) {
-                System.out.println("✅ Token válido. Usuário: " + login); // DEBUG
-
-                hanrry.cdg.models.User userEntity = userRepository.findByEmail(login)
-                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
-                UserDetails user = org.springframework.security.core.userdetails.User
-                        .withUsername(userEntity.getEmail())
-                        .password(userEntity.getSenha())
-                        .authorities("USER")
-                        .build();
-
-                var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                System.out.println("❌ Token inválido ou expirado.");
+                try {
+                    var userEntity = login.startsWith("id:")
+                            ? userRepository.findById(Long.parseLong(login.substring(3)))
+                            : userRepository.findByEmail(login);
+                    userEntity.ifPresent(entity -> {
+                        UserDetails user = org.springframework.security.core.userdetails.User
+                                .withUsername(entity.getId().toString())
+                                .password(entity.getSenha() == null ? "" : entity.getSenha())
+                                .authorities("USER")
+                                .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+                    });
+                } catch (NumberFormatException ignored) {
+                    // Um identificador inválido não autentica a requisição.
+                }
             }
-        } else {
-            System.out.println("⚠️ Nenhum token encontrado no header.");
         }
 
         filterChain.doFilter(request, response);
