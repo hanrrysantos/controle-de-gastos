@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
-import { House, List, Plus, Tags } from 'lucide-react'
+import { House, Plus, ReceiptText, Shapes } from 'lucide-react'
 import { api, type Sessao } from './api'
 import { AuthPage, CategoriesPage, CategoryFormPage, DashboardPage, TransactionFormPage, TransactionsPage } from './screens'
 import './App.css'
@@ -25,13 +25,13 @@ function Protected({ context }: { context: ScreenContext | null }) {
           <House size={21} aria-hidden="true" /><span>Início</span>
         </NavLink>
         <NavLink to="/extrato" className={({ isActive }) => isActive ? 'tab active' : 'tab'}>
-          <List size={21} aria-hidden="true" /><span>Extrato</span>
+          <ReceiptText size={21} aria-hidden="true" /><span>Extrato</span>
         </NavLink>
         <NavLink to="/novo" className="tab add-tab" aria-label="Novo lançamento">
-          <span className="add-circle"><Plus size={23} aria-hidden="true" /></span>
+          <span className="add-circle"><Plus size={24} aria-hidden="true" /></span>
         </NavLink>
         <NavLink to="/categorias" className={({ isActive }) => isActive ? 'tab active' : 'tab'}>
-          <Tags size={21} aria-hidden="true" /><span>Categorias</span>
+          <Shapes size={21} aria-hidden="true" /><span>Categorias</span>
         </NavLink>
       </nav>
     </div>
