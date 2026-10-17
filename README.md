@@ -80,9 +80,9 @@ npm run dev
 Abra `http://localhost:5173`. Durante o desenvolvimento, o Vite encaminha `/api` para `http://localhost:8080`. Para outra porta local, use `CDG_API_PROXY` conforme o [README do frontend](frontend/README.md). O login recebe `token` e `nome`; o token expira após 24 horas e a sessão do navegador é guardada por aba. A API devolve valores monetários como texto decimal para preservar os centavos no navegador.
 
 ### 3. Conecte o Telegram
-Configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` e `GEMINI_API_KEY` no ambiente da API. `CDG_WEB_URL` deve apontar para a URL HTTPS pública do frontend, sem barra final. Cadastre no Telegram o webhook público `POST /integracoes/telegram/webhook` usando o mesmo segredo em `secret_token`.
+Configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` (nome do bot, sem `@`) e `GEMINI_API_KEY` no ambiente da API. `CDG_WEB_URL` deve apontar para a URL HTTPS pública do frontend, sem barra final. Cadastre no Telegram o webhook público `POST /integracoes/telegram/webhook` usando o mesmo segredo em `secret_token`.
 
-Entre no navegador e toque em **Conectar Telegram** na tela inicial. Envie o comando `/start <código>` mostrado na tela em uma conversa privada com o bot e toque em **Verificar conexão**. O código vale por 10 minutos. Se o bot já tiver criado uma conta sem e-mail, os lançamentos dela passam para a conta vinculada. Se estiver ligado a outro e-mail, os dados antigos permanecem naquela conta e os novos lançamentos passam a entrar na conta recém-vinculada.
+Entre no navegador, toque no botão **Telegram** no topo da Visão geral e depois em **Conectar Telegram**. Com `TELEGRAM_BOT_USERNAME` configurado, o botão **Abrir no Telegram** leva direto ao bot com o código preenchido; basta tocar em **Iniciar**. Sem ele, envie o comando `/start <código>` mostrado na tela em uma conversa privada com o bot. A tela confirma a conexão sozinha. O código vale por 10 minutos. Se o bot já tiver criado uma conta sem e-mail, os lançamentos dela passam para a conta vinculada. Se estiver ligado a outro e-mail, os dados antigos permanecem naquela conta e os novos lançamentos passam a entrar na conta recém-vinculada.
 
 Depois, envie uma mensagem como `gastei R$ 32,50 no almoço`, confira os dados que o bot devolveu e toque em **Confirmar**. O lançamento aparecerá no dashboard e no extrato ao recarregar a página. **Cancelar** não registra a transação. O botão **Abrir dashboard** enviado pelo bot abre o mesmo frontend como Mini App e valida a identidade assinada pelo Telegram.
 
@@ -134,9 +134,10 @@ Documentação das rotas disponíveis na API REST.
 | `POST` | `/auth/register` | Criação de novo usuário |
 | `POST` | `/auth/login` | Autenticação (retorna token JWT e nome) |
 | `POST` | `/auth/telegram/webapp` | Autentica a Mini App com dados assinados pelo Telegram |
-| `GET/POST` | `/integracoes/telegram/vinculo` | Consulta o vínculo ou gera o código de conexão |
+| `GET/POST` | `/integracoes/telegram/vinculo` | Consulta o vínculo ou gera o código de conexão (com link `t.me` quando `TELEGRAM_BOT_USERNAME` está definido) |
 | `POST` | `/integracoes/telegram/webhook` | Recebe mensagens e confirmações do bot |
 | `GET` | `/transacoes/dashboard` | Retorna o resumo financeiro (Saldo, Receitas, Despesas) |
+| `GET` | `/transacoes/resumo?mes=AAAA-MM` | Resumo do mês: totais, comparação com o mês anterior, saldo acumulado e total por categoria |
 | `POST` | `/transacoes` | Cria nova receita ou despesa |
 | `DELETE` | `/transacoes/{id}` | Remove um lançamento |
 | `GET` | `/categorias` | Lista as categorias cadastradas pelo usuário |
