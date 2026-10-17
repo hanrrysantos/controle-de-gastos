@@ -1,9 +1,9 @@
 # 💰 CDG — Sistema de Controle de Gastos
 
 ![Java](https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=java)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3-green?style=for-the-badge&logo=spring)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4-green?style=for-the-badge&logo=spring)
 ![MySQL](https://img.shields.io/badge/MySQL-005C84?style=for-the-badge&logo=mysql&logoColor=white)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-5-purple?style=for-the-badge&logo=bootstrap)
+![React](https://img.shields.io/badge/React-TypeScript-blue?style=for-the-badge&logo=react)
 
 Sistema web **Fullstack** desenvolvido para facilitar o controle financeiro pessoal, permitindo gerenciar receitas e despesas, organizar categorias e visualizar o saldo em tempo real através de um dashboard intuitivo.
 
@@ -23,6 +23,7 @@ O sistema garante a segurança dos dados através de autenticação via Token e 
 - 💸 **Gestão de Transações:** Lançamento de Receitas e Despesas com data e descrição.
 - 🏷️ **Categorias Personalizadas:** O usuário cria suas próprias categorias (ex: Alimentação, Lazer, Salário).
 - 📊 **Dashboard Dinâmico:** Cálculo automático de saldo, total de entradas e saídas.
+- 🤖 **Registro pelo Telegram:** Mensagens de texto são interpretadas, confirmadas no chat e aparecem no dashboard.
 - 📄 **Extrato Detalhado:** Histórico visual de lançamentos com indicadores de cor (Verde/Vermelho).
 - 🗑️ **Controle Total:** Possibilidade de excluir lançamentos errados (Lixeira).
 - 🛡️ **Segurança de Dados:** Senhas criptografadas (BCrypt) e dados isolados por usuário.
@@ -32,13 +33,12 @@ O sistema garante a segurança dos dados através de autenticação via Token e 
 ## 🛠️ Tecnologias Utilizadas
 
 ### 🌐 Frontend
-- **HTML5 & CSS3**
-- **JavaScript (ES6+)** - Consumo de API via `fetch`.
-- **Bootstrap 5** - Design responsivo e componentes (Modais, Cards, Tabelas).
+- **React + TypeScript + Vite** - Interface mobile para navegador, com consumo da API via `fetch`.
+- **CSS próprio + Lucide** - Layout baseado no design B.
 
 ### ⚙️ Backend
 - **Java 21**
-- **Spring Boot 3**
+- **Spring Boot 4**
 - **Spring Security** (Autenticação e Autorização)
 - **Spring Data JPA** (Persistência de dados)
 - **MapStruct** (Mapeamento inteligente de DTOs)
@@ -66,12 +66,27 @@ O projeto segue o padrão em camadas (**Layered Architecture**) para garantir de
 - Java 21 instalado.
 - MySQL rodando (local ou Docker).
 - Maven.
+- Node.js e npm.
 
-### 1. Clone o repositório
+### 1. Execute a API
+Na raiz, execute `docker compose up --build -d` para iniciar API e banco. O frontend continua separado: use `cd frontend && npm install && npm run dev`. Para rodar a API fora do Docker, defina `DB_PASSWORD` e `JWT_SECRET` e execute `bash mvnw spring-boot:run`.
+
+### 2. Execute o frontend
 ```bash
-git clone [https://github.com/seu-usuario/controle-de-gastos.git]
-cd controle-de-gastos
+cd frontend
+npm install
+npm run dev
 ```
+Abra `http://localhost:5173`. Durante o desenvolvimento, o Vite encaminha `/api` para `http://localhost:8080`. Para outra porta local, use `CDG_API_PROXY` conforme o [README do frontend](frontend/README.md). O login recebe `token` e `nome`; o token expira após 24 horas e a sessão do navegador é guardada por aba. A API devolve valores monetários como texto decimal para preservar os centavos no navegador.
+
+### 3. Conecte o Telegram
+Configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` e `GEMINI_API_KEY` no ambiente da API. `CDG_WEB_URL` deve apontar para a URL HTTPS pública do frontend, sem barra final. Cadastre no Telegram o webhook público `POST /integracoes/telegram/webhook` usando o mesmo segredo em `secret_token`.
+
+Entre no navegador e toque em **Conectar Telegram** na tela inicial. Envie o comando `/start <código>` mostrado na tela em uma conversa privada com o bot e toque em **Verificar conexão**. O código vale por 10 minutos. Se o bot já tiver criado uma conta sem e-mail, os lançamentos dela passam para a conta vinculada. Se estiver ligado a outro e-mail, os dados antigos permanecem naquela conta e os novos lançamentos passam a entrar na conta recém-vinculada.
+
+Depois, envie uma mensagem como `gastei R$ 32,50 no almoço`, confira os dados que o bot devolveu e toque em **Confirmar**. O lançamento aparecerá no dashboard e no extrato ao recarregar a página. **Cancelar** não registra a transação. O botão **Abrir dashboard** enviado pelo bot abre o mesmo frontend como Mini App e valida a identidade assinada pelo Telegram.
+
+Em bancos criados antes da mudança para `BigDecimal`, execute [scripts/migrate-telegram-money.sql](scripts/migrate-telegram-money.sql) uma vez para converter o valor das confirmações pendentes em `DECIMAL(19,2)`. Em um banco novo, a tabela já nasce com esse tipo.
 
 ## 💾 Estrutura de Dados
 
@@ -103,7 +118,7 @@ O registro financeiro propriamente dito (entrada ou saída de dinheiro).
 | Campo | Tipo | Descrição |
 | :--- | :--- | :--- |
 | `id` | `Long` | Identificador único |
-| `valor` | `Double` | Valor monetário da transação |
+| `valor` | `BigDecimal` | Valor monetário com duas casas decimais (`DECIMAL(19,2)` no MySQL) |
 | `descricao` | `String` | Detalhe do gasto (ex: "Pizza de Sexta") |
 | `data` | `LocalDate` | Data em que ocorreu o lançamento |
 | `tipo` | `Enum` | Herda o tipo da categoria (Receita/Despesa) |
@@ -117,7 +132,10 @@ Documentação das rotas disponíveis na API REST.
 | Método | Rota | Descrição |
 |:---:|:---|:---|
 | `POST` | `/auth/register` | Criação de novo usuário |
-| `POST` | `/auth/login` | Autenticação (Retorna Token JWT) |
+| `POST` | `/auth/login` | Autenticação (retorna token JWT e nome) |
+| `POST` | `/auth/telegram/webapp` | Autentica a Mini App com dados assinados pelo Telegram |
+| `GET/POST` | `/integracoes/telegram/vinculo` | Consulta o vínculo ou gera o código de conexão |
+| `POST` | `/integracoes/telegram/webhook` | Recebe mensagens e confirmações do bot |
 | `GET` | `/transacoes/dashboard` | Retorna o resumo financeiro (Saldo, Receitas, Despesas) |
 | `POST` | `/transacoes` | Cria nova receita ou despesa |
 | `DELETE` | `/transacoes/{id}` | Remove um lançamento |

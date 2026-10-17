@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-controle_de_gastos}
+      DB_USER: ${DB_USER:-cdg}
+      DB_PASSWORD: ${DB_PASSWORD:-cdg_dev_password}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-this-secret}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      CDG_WEB_URL: ${CDG_WEB_URL:-http://localhost:5173}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-controle_de_gastos}
+      MYSQL_USER: ${DB_USER:-cdg}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cdg_dev_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-cdg_root_dev_password}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:
