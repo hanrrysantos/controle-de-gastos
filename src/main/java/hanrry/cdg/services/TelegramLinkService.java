@@ -32,16 +32,19 @@ public class TelegramLinkService {
     private final TransacaoRepository transacaoRepository;
     private final ObjectMapper objectMapper;
     private final String botToken;
+    private final String botUsername;
     private final SecureRandom random = new SecureRandom();
 
     public TelegramLinkService(UserRepository userRepository, CategoriaRepository categoriaRepository,
                                TransacaoRepository transacaoRepository, ObjectMapper objectMapper,
-                               @Value("${TELEGRAM_BOT_TOKEN:}") String botToken) {
+                               @Value("${TELEGRAM_BOT_TOKEN:}") String botToken,
+                               @Value("${TELEGRAM_BOT_USERNAME:}") String botUsername) {
         this.userRepository = userRepository;
         this.categoriaRepository = categoriaRepository;
         this.transacaoRepository = transacaoRepository;
         this.objectMapper = objectMapper;
         this.botToken = botToken;
+        this.botUsername = botUsername.replaceFirst("^@", "").trim();
     }
 
     @Transactional
@@ -130,7 +133,8 @@ public class TelegramLinkService {
         user.setTelegramLinkTokenHash(hash(codigo));
         user.setTelegramLinkExpiresAt(expiraEm);
         userRepository.save(user);
-        return new TelegramLinkResponseDTO(codigo, expiraEm);
+        String link = botUsername.isEmpty() ? null : "https://t.me/" + botUsername + "?start=" + codigo;
+        return new TelegramLinkResponseDTO(codigo, expiraEm, link);
     }
 
     @Transactional

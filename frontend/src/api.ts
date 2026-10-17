@@ -11,6 +11,19 @@ export type Transacao = {
   tipo: Tipo
 }
 export type Resumo = { totalReceitas: string; totalDespesas: string; saldo: string }
+export type ResumoCategoria = { id: number; nome: string; tipo: Tipo; total: string; quantidade: number }
+export type ResumoMensal = {
+  mes: string
+  totalReceitas: string
+  totalDespesas: string
+  saldo: string
+  receitasMesAnterior: string
+  despesasMesAnterior: string
+  saldoAcumulado: string
+  quantidadeLancamentos: number
+  categorias: ResumoCategoria[]
+}
+export type VinculoTelegram = { codigo: string; expiraEm: string; link: string | null }
 
 export class ApiError extends Error {
   status: number
