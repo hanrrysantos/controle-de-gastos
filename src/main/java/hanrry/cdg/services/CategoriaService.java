@@ -2,6 +2,7 @@ package hanrry.cdg.services;
 
 import hanrry.cdg.dtos.CategoriaCreateDTO;
 import hanrry.cdg.dtos.CategoriaResponseDTO;
+import hanrry.cdg.exceptions.BusinessRuleException;
 import hanrry.cdg.exceptions.ResourceNotFoundException;
 import hanrry.cdg.mappers.CategoriaMapper;
 import hanrry.cdg.models.Categoria;
@@ -29,9 +30,12 @@ public class CategoriaService {
     }
 
     public CategoriaResponseDTO criar(CategoriaCreateDTO dto) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (dto.getNome() == null || dto.getNome().isBlank() || dto.getTipo() == null) {
+            throw new BusinessRuleException("Preencha nome e tipo da categoria.");
+        }
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
 
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado no sistema."));
 
         Categoria categoria = mapper.toEntity(dto);
@@ -43,8 +47,8 @@ public class CategoriaService {
 
     @Transactional(readOnly = true)
     public List<CategoriaResponseDTO> listar() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow();
 
         return user.getCategorias().stream()
                 .map(mapper::toDto)

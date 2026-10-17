@@ -3,6 +3,7 @@ package hanrry.cdg.models;
 import jakarta.persistence.*;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -13,7 +14,8 @@ public class Transacao implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Double valor;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal valor;
     private String descricao;
     private LocalDate data;
     private TipoTransacao tipo;
@@ -37,11 +39,11 @@ public class Transacao implements Serializable {
         this.id = id;
     }
 
-    public Double getValor() {
+    public BigDecimal getValor() {
         return valor;
     }
 
-    public void setValor(Double valor) {
+    public void setValor(BigDecimal valor) {
         this.valor = valor;
     }
 

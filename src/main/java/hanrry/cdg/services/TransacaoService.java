@@ -4,6 +4,7 @@ import hanrry.cdg.dtos.DashboardResponseDTO;
 import hanrry.cdg.dtos.TransacaoRequestDTO;
 import hanrry.cdg.dtos.TransacaoResponseDTO;
 import hanrry.cdg.exceptions.AccessDeniedException;
+import hanrry.cdg.exceptions.BusinessRuleException;
 import hanrry.cdg.exceptions.ResourceNotFoundException;
 import hanrry.cdg.mappers.TransacaoMapper;
 import hanrry.cdg.models.Categoria;
@@ -18,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.stream.Collectors;
 
 @Transactional
@@ -37,8 +39,15 @@ public class TransacaoService {
     }
 
     public TransacaoResponseDTO criar(TransacaoRequestDTO dto) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        if (dto.getValor() == null || dto.getValor().signum() <= 0 || dto.getValor().stripTrailingZeros().scale() > 2
+                || dto.getValor().precision() - dto.getValor().scale() > 17) {
+            throw new BusinessRuleException("O valor deve ser positivo, ter no máximo duas casas decimais e caber no limite monetário.");
+        }
+        if (dto.getCategoriaId() == null || dto.getData() == null || dto.getDescricao() == null || dto.getDescricao().isBlank()) {
+            throw new BusinessRuleException("Preencha descrição, data e categoria.");
+        }
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado."));
 
         Categoria categoria = categoriaRepository.findById(dto.getCategoriaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada com ID: " + dto.getCategoriaId()));
@@ -57,8 +66,8 @@ public class TransacaoService {
     }
 
     public List<TransacaoResponseDTO> listar() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow();
 
         return user.getTransacoes().stream()
                 .map(mapper::toDto)
@@ -66,35 +75,35 @@ public class TransacaoService {
     }
 
     public DashboardResponseDTO getDashboard() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow();
 
         List<Transacao> transacoes = user.getTransacoes();
 
-        Double totalReceitas = transacoes.stream()
+        BigDecimal totalReceitas = transacoes.stream()
                 .filter(t -> t.getTipo() == TipoTransacao.RECEITA)
-                .mapToDouble(Transacao::getValor)
-                .sum();
+                .map(Transacao::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Double totalDespesas = transacoes.stream()
+        BigDecimal totalDespesas = transacoes.stream()
                 .filter(t -> t.getTipo() == TipoTransacao.DESPESA)
-                .mapToDouble(Transacao::getValor)
-                .sum();
+                .map(Transacao::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Double saldo = totalReceitas - totalDespesas;
+        BigDecimal saldo = totalReceitas.subtract(totalDespesas);
 
         return new DashboardResponseDTO(totalReceitas, totalDespesas, saldo);
     }
 
     public void deletar(Long id) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow();
 
         Transacao transacao = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada."));
 
         if (!transacao.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Você não tem permissão para excluir isso.");
+            throw new AccessDeniedException("Você não tem permissão para excluir este lançamento.");
         }
 
         repository.delete(transacao);

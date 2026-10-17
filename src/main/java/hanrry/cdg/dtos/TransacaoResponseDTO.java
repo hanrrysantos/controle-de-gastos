@@ -1,10 +1,13 @@
 package hanrry.cdg.dtos;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 public class TransacaoResponseDTO {
     private Long id;
-    private Double valor;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private BigDecimal valor;
     private String descricao;
     private LocalDate data;
     private String nomeCategoria;
@@ -15,8 +18,8 @@ public class TransacaoResponseDTO {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Double getValor() { return valor; }
-    public void setValor(Double valor) { this.valor = valor; }
+    public BigDecimal getValor() { return valor; }
+    public void setValor(BigDecimal valor) { this.valor = valor; }
 
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }

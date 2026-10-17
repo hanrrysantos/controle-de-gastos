@@ -3,6 +3,7 @@ package hanrry.cdg.exceptions;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -10,6 +11,13 @@ import java.time.Instant;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<StandardError> authentication(AuthenticationException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.UNAUTHORIZED;
+        StandardError err = new StandardError(Instant.now(), status.value(), "Não autorizado", "E-mail ou senha inválidos.", request.getRequestURI());
+        return ResponseEntity.status(status).body(err);
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<StandardError> resourceNotFound(ResourceNotFoundException e, HttpServletRequest request) {
@@ -39,7 +47,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<StandardError> database(Exception e, HttpServletRequest request) {
         String error = "Erro interno no servidor";
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
-        StandardError err = new StandardError(Instant.now(), status.value(), error, e.getMessage(), request.getRequestURI());
+        StandardError err = new StandardError(Instant.now(), status.value(), error, "Não foi possível concluir a operação.", request.getRequestURI());
         return ResponseEntity.status(status).body(err);
     }
 }

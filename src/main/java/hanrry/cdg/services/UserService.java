@@ -3,6 +3,7 @@ package hanrry.cdg.services;
 import hanrry.cdg.dtos.UserRegisterDTO;
 import hanrry.cdg.dtos.UserResponseDTO;
 import hanrry.cdg.exceptions.BusinessRuleException;
+import hanrry.cdg.exceptions.ResourceNotFoundException;
 import hanrry.cdg.mappers.UserMapper;
 import hanrry.cdg.models.User;
 import hanrry.cdg.repositories.UserRepository;
@@ -23,6 +24,10 @@ public class UserService {
     }
 
     public UserResponseDTO cadastrar(UserRegisterDTO dto) {
+        if (dto.getNome() == null || dto.getNome().isBlank() || dto.getEmail() == null || dto.getEmail().isBlank()
+                || dto.getSenha() == null || dto.getSenha().isBlank()) {
+            throw new BusinessRuleException("Preencha nome, e-mail e senha.");
+        }
         if (repository.findByEmail(dto.getEmail()).isPresent()) {
             throw new BusinessRuleException("Este e-mail já está em uso.");
         }
@@ -35,5 +40,11 @@ public class UserService {
         User salvo = repository.save(user);
 
         return mapper.toDto(salvo);
+    }
+
+    public UserResponseDTO buscarPorEmail(String email) {
+        return repository.findByEmail(email)
+                .map(mapper::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado."));
     }
 }
