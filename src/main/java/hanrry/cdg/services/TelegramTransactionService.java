@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class TelegramTransactionService {
     public Resposta preparar(Long telegramUserId, String texto) {
         pendingRepository.deleteAllByExpiraEmBefore(Instant.now());
         User user = userRepository.findByTelegramUserId(telegramUserId).orElse(null);
-        if (user == null) return new Resposta("Envie /start para criar sua conta e começar.", null);
+        if (user == null) return new Resposta("👋 Para começar, envie /start e eu preparo sua conta.", null);
 
         List<Categoria> categorias = categoriaRepository.findByUserId(user.getId());
 
@@ -53,7 +54,7 @@ public class TelegramTransactionService {
                 interpretada.valor().stripTrailingZeros().scale() > 2 ||
                 interpretada.valor().precision() - interpretada.valor().scale() > 17 ||
                 interpretada.descricao() == null || interpretada.descricao().isBlank() || interpretada.descricao().length() > 255) {
-            return new Resposta("Não identifiquei um valor válido. Envie algo como: gastei 32,50 reais no almoço.", null);
+            return new Resposta("🤔 Não encontrei um valor válido. Tente assim: “Gastei R$ 32,50 no almoço”.", null);
         }
 
         TipoTransacao tipo;
@@ -64,12 +65,12 @@ public class TelegramTransactionService {
             data = interpretada.data() == null || interpretada.data().isBlank()
                     ? LocalDate.now(ZoneId.of("America/Sao_Paulo")) : LocalDate.parse(interpretada.data());
         } catch (RuntimeException e) {
-            return new Resposta("Não consegui identificar os detalhes da transação. Tente reformular a mensagem.", null);
+            return new Resposta("🤔 Não consegui entender os detalhes. Pode escrever de outro jeito?", null);
         }
 
         String categoriaNome = interpretada.categoria() == null ? "" : interpretada.categoria().trim();
         if (categoriaNome.length() > 255) {
-            return new Resposta("O nome da categoria ficou muito longo. Tente uma categoria mais curta.", null);
+            return new Resposta("🏷️ O nome da categoria ficou longo. Tente usar um nome mais curto.", null);
         }
         String categoriaInformada = categoriaNome;
         Categoria categoria = categorias.stream()
@@ -104,9 +105,13 @@ public class TelegramTransactionService {
         pendente.setExpiraEm(Instant.now().plusSeconds(600));
         pendingRepository.save(pendente);
 
-        String resumo = "Confirma esta transação?\n" + String.format(Locale.forLanguageTag("pt-BR"), "R$ %,.2f", pendente.getValor()) +
-                " — " + pendente.getDescricao() + "\nCategoria: " + categoriaNome +
-                (criarCategoria ? " (será criada)" : "") + "\nTipo: " + tipo + "\nData: " + data;
+        String resumo = "🧾 Confere esse lançamento?\n\n" +
+                "💰 Valor: " + String.format(Locale.forLanguageTag("pt-BR"), "R$ %,.2f", pendente.getValor()) +
+                "\n📝 Descrição: " + pendente.getDescricao() +
+                "\n🏷️ Categoria: " + categoriaNome + (criarCategoria ? " ✨ (nova)" : "") +
+                "\n" + (tipo == TipoTransacao.RECEITA ? "📈 Tipo: Receita" : "📉 Tipo: Despesa") +
+                "\n📅 Data: " + data.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                "\n\nConfirma para salvar ou cancela para descartar 👇";
         return new Resposta(resumo, "confirmar:" + pendente.getId());
     }
 
@@ -114,17 +119,17 @@ public class TelegramTransactionService {
     public String confirmar(String id, Long telegramUserId) {
         TransacaoPendenteTelegram pendente = pendingRepository.findById(id).orElse(null);
         if (pendente == null || !pendente.getTelegramUserId().equals(telegramUserId)) {
-            return "Esta confirmação expirou ou já foi processada. Envie a transação novamente se necessário.";
+            return "⏳ Esta confirmação expirou ou já foi usada. Envie a transação novamente.";
         }
         if (!pendente.getExpiraEm().isAfter(Instant.now())) {
             pendingRepository.delete(pendente);
-            return "Esta confirmação expirou. Envie a transação novamente.";
+            return "⏳ Esta confirmação expirou. Envie a transação novamente.";
         }
 
         User user = userRepository.findByTelegramUserId(telegramUserId).orElse(null);
         if (user == null) {
             pendingRepository.delete(pendente);
-            return "Não foi possível validar sua conta. Tente enviar a transação novamente.";
+            return "⚠️ Não consegui validar sua conta. Envie a transação novamente.";
         }
 
         Categoria categoria;
@@ -132,7 +137,7 @@ public class TelegramTransactionService {
             categoria = categoriaRepository.findById(pendente.getCategoriaId()).orElse(null);
             if (categoria == null || categoria.getUser() == null || !categoria.getUser().getId().equals(user.getId())) {
                 pendingRepository.delete(pendente);
-                return "Não foi possível validar a categoria. Tente enviar a transação novamente.";
+                return "⚠️ Não consegui validar a categoria. Envie a transação novamente.";
             }
         } else {
             categoria = categoriaRepository.findByUserId(user.getId()).stream()
@@ -157,17 +162,17 @@ public class TelegramTransactionService {
         transacao.setUser(user);
         transacaoRepository.save(transacao);
         pendingRepository.delete(pendente);
-        return "Transação registrada no CDG!";
+        return "✅ Lançamento salvo no CDG!\nEle já está no seu dashboard 📊";
     }
 
     @Transactional
     public String cancelar(String id, Long telegramUserId) {
         TransacaoPendenteTelegram pendente = pendingRepository.findById(id).orElse(null);
         if (pendente == null || !pendente.getTelegramUserId().equals(telegramUserId)) {
-            return "Esta confirmação expirou ou já foi processada.";
+            return "⏳ Esta confirmação expirou ou já foi usada.";
         }
         pendingRepository.delete(pendente);
-        return "Tudo bem, não registrei a transação.";
+        return "🗑️ Lançamento cancelado. Nada foi salvo.";
     }
 
     public record Resposta(String texto, String callbackConfirmacao) { }

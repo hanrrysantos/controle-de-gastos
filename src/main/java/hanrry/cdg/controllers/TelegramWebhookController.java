@@ -70,11 +70,11 @@ public class TelegramWebhookController {
             return ResponseEntity.ok().build();
         }
         if (text.isBlank()) {
-            responder(chatId, "Por enquanto, envie a transação por mensagem de texto.", null);
+            responder(chatId, "💬 Por enquanto, consigo registrar mensagens de texto. Mande sua transação por escrito.", null);
             return ResponseEntity.ok().build();
         }
         if (text.length() > 1000) {
-            responder(chatId, "A mensagem ficou muito longa. Envie uma descrição mais curta da transação.", null);
+            responder(chatId, "✂️ A mensagem ficou longa. Envie uma descrição mais curta da transação.", null);
             return ResponseEntity.ok().build();
         }
 
@@ -86,36 +86,41 @@ public class TelegramWebhookController {
                         message.path("from").path("last_name").asText("")).trim();
                 linkService.obterOuCriarContaTelegram(telegramUserId, nome);
                 enviarAcessoDashboard(chatId,
-                        "Conta pronta! Envie suas transações por aqui. Categorias novas são criadas após a confirmação. Toque em Abrir dashboard e fixe esta mensagem para voltar ao painel.");
+                        "👋 Conta pronta! Mande seus gastos e ganhos por aqui.\n\n" +
+                                "Exemplo: “Gastei R$ 32,50 no almoço” 🍽️\n\n" +
+                                "Eu preparo o lançamento para você conferir antes de salvar. 📊");
             } else if (parts.length == 2) {
                 try {
                     linkService.vincular(parts[1], telegramUserId);
-                    enviarAcessoDashboard(chatId, "Telegram vinculado à sua conta CDG!");
+                    enviarAcessoDashboard(chatId, "🔗 Telegram conectado à sua conta CDG!\nAgora seus lançamentos aparecem no dashboard. 🎉");
                 } catch (BusinessRuleException e) {
-                    responder(chatId, e.getMessage(), null);
+                    responder(chatId, "⚠️ " + e.getMessage(), null);
                 }
             } else {
-                responder(chatId, "Para começar, envie /start. Para usar um código de vínculo antigo, envie /start <código>.", null);
+                responder(chatId, "ℹ️ Para começar, envie /start. Para conectar sua conta CDG, envie /start seguido do código exibido no dashboard.", null);
             }
         } else if (command.equals("/dashboard") || command.equals("/painel")) {
             String nome = (message.path("from").path("first_name").asText("") + " " +
                     message.path("from").path("last_name").asText("")).trim();
             linkService.obterOuCriarContaTelegram(telegramUserId, nome);
-            enviarAcessoDashboard(chatId, "Abra seu dashboard pelo botão abaixo.");
+            enviarAcessoDashboard(chatId, "📊 Seu dashboard está a um toque de distância!");
         } else {
+            long thinkingMessageId = iniciarPensando(chatId);
             try {
+                indicarDigitacao(chatId);
                 TelegramTransactionService.Resposta resposta = transactionService.preparar(telegramUserId, text);
-                responder(chatId, resposta.texto(), resposta.callbackConfirmacao());
+                atualizarPensando(chatId, thinkingMessageId, resposta.texto(), resposta.callbackConfirmacao());
             } catch (BusinessRuleException e) {
                 log.warn("Não foi possível preparar a transação pelo Telegram: {}", e.getMessage());
-                responder(chatId, e.getMessage(), null);
+                atualizarPensando(chatId, thinkingMessageId, "⚠️ " + e.getMessage(), null);
             } catch (RuntimeException e) {
                 if (e instanceof RestClientResponseException responseException) {
                     log.warn("Falha na chamada ao Gemini: HTTP {}.", responseException.getStatusCode().value());
                 } else {
                     log.warn("Falha ao interpretar mensagem do Telegram: {}.", e.getClass().getSimpleName());
                 }
-                responder(chatId, "Não consegui processar agora. Tente novamente em instantes.", null);
+                atualizarPensando(chatId, thinkingMessageId,
+                        "😕 Não consegui processar agora. Tente novamente em instantes.", null);
             }
         }
         return ResponseEntity.ok().build();
@@ -154,27 +159,65 @@ public class TelegramWebhookController {
             return;
         }
         try {
-            Map<String, Object> message = new java.util.HashMap<>();
-            message.put("chat_id", chatId);
-            message.put("text", text);
-            java.util.List<java.util.List<Map<String, Object>>> rows = new java.util.ArrayList<>();
-            if (callbackData != null) {
-                String id = callbackData.substring(callbackData.indexOf(':') + 1);
-                rows.add(java.util.List.of(
-                        Map.of("text", "Confirmar", "callback_data", callbackData),
-                        Map.of("text", "Cancelar", "callback_data", "cancelar:" + id)));
-            }
-            if (webAppUrl != null) {
-                rows.add(java.util.List.of(Map.of("text", "Abrir dashboard", "web_app", Map.of("url", webAppUrl))));
-            }
-            if (!rows.isEmpty()) message.put("reply_markup", Map.of("inline_keyboard", rows));
             telegram.post()
                     .uri("https://api.telegram.org/bot" + botToken + "/sendMessage")
-                    .body(message)
+                    .body(montarMensagem(chatId, text, callbackData, webAppUrl))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RuntimeException e) {
             log.warn("Não foi possível enviar a resposta ao Telegram.");
+        }
+    }
+
+    private Map<String, Object> montarMensagem(long chatId, String text, String callbackData, String webAppUrl) {
+        Map<String, Object> message = new java.util.HashMap<>();
+        message.put("chat_id", chatId);
+        message.put("text", text);
+        java.util.List<java.util.List<Map<String, Object>>> rows = new java.util.ArrayList<>();
+        if (callbackData != null) {
+            String id = callbackData.substring(callbackData.indexOf(':') + 1);
+            rows.add(java.util.List.of(
+                    Map.of("text", "✅ Confirmar", "callback_data", callbackData),
+                    Map.of("text", "✖️ Cancelar", "callback_data", "cancelar:" + id)));
+        }
+        if (webAppUrl != null) {
+            rows.add(java.util.List.of(Map.of("text", "📊 Abrir dashboard", "web_app", Map.of("url", webAppUrl))));
+        }
+        if (!rows.isEmpty()) message.put("reply_markup", Map.of("inline_keyboard", rows));
+        return message;
+    }
+
+    private long iniciarPensando(long chatId) {
+        if (botToken.isBlank()) return 0;
+        try {
+            JsonNode response = telegram.post()
+                    .uri("https://api.telegram.org/bot" + botToken + "/sendMessage")
+                    .body(Map.of("chat_id", chatId, "text", "🧠 Pensando…"))
+                    .retrieve()
+                    .body(JsonNode.class);
+            return response == null ? 0 : response.path("result").path("message_id").asLong(0);
+        } catch (RuntimeException e) {
+            log.warn("Não foi possível mostrar o estado de processamento no Telegram.");
+            return 0;
+        }
+    }
+
+    private void atualizarPensando(long chatId, long messageId, String text, String callbackData) {
+        if (messageId == 0) {
+            responder(chatId, text, callbackData);
+            return;
+        }
+        try {
+            Map<String, Object> message = montarMensagem(chatId, text, callbackData, null);
+            message.put("message_id", messageId);
+            telegram.post()
+                    .uri("https://api.telegram.org/bot" + botToken + "/editMessageText")
+                    .body(message)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RuntimeException e) {
+            log.warn("Não foi possível atualizar a mensagem de processamento no Telegram.");
+            responder(chatId, text, callbackData);
         }
     }
 
@@ -188,6 +231,19 @@ public class TelegramWebhookController {
                     .toBodilessEntity();
         } catch (RuntimeException e) {
             log.debug("Não foi possível confirmar o callback do Telegram.");
+        }
+    }
+
+    private void indicarDigitacao(long chatId) {
+        if (botToken.isBlank()) return;
+        try {
+            telegram.post()
+                    .uri("https://api.telegram.org/bot" + botToken + "/sendChatAction")
+                    .body(Map.of("chat_id", chatId, "action", "typing"))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RuntimeException e) {
+            log.debug("Não foi possível indicar digitação no Telegram.");
         }
     }
 }
