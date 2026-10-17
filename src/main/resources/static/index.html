@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#6d28d9">
+  <title>Meu orçamento · CDG</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#211c31;background:#f6f3fa;font-synthesis:none}
+    *{box-sizing:border-box}body{margin:0;padding:env(safe-area-inset-top) 18px env(safe-area-inset-bottom);max-width:560px;min-height:100vh;margin-inline:auto}
+    header{display:flex;justify-content:space-between;align-items:center;padding:20px 2px 14px}h1{font-size:18px;margin:0}header p,.eyebrow{font-size:10px;color:#777184;margin:4px 0 0}
+    #state{margin:22vh auto 0;text-align:center;max-width:320px;font-size:14px;line-height:1.5;color:#514b5d}.card{background:white;border-radius:20px;padding:16px;margin:12px 0}
+    .hero{background:linear-gradient(135deg,#6d28d9,#912fe0);color:white;padding:20px;border-radius:24px;margin:4px 0 14px}.hero .eyebrow{color:#e6d9ff;font-weight:700;letter-spacing:.08em}.balance{font-size:30px;font-weight:750;margin:9px 0 20px;letter-spacing:-.04em}.totals{display:flex;gap:24px}.totals span{display:block;color:#eadfff;font-size:11px;margin-bottom:4px}.totals strong{font-size:14px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}h2{font-size:14px;margin:0}.muted{color:#898396;font-size:10px}.spend-total{font-size:12px;color:#777184;margin:8px 0 12px}.chart-layout{display:flex;align-items:center;gap:18px;min-height:112px}
+    .pie{position:relative;width:104px;height:104px;border-radius:50%;flex:none;background:#eeeaf3}.pie:after{content:"";position:absolute;inset:26px;border-radius:50%;background:white}.legend{display:grid;gap:8px;min-width:0;flex:1}.legend-row{display:flex;align-items:center;gap:6px;min-width:0;font-size:10px}.dot{width:8px;height:8px;border-radius:50%;flex:none}.legend-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.legend-value{font-weight:650;white-space:nowrap}
+    .transactions{display:grid;gap:2px}.transaction{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1eff4}.transaction:last-child{border:0}.badge{width:34px;height:34px;border-radius:12px;background:#f0eaff;color:#7143d5;display:grid;place-items:center;font-size:15px}.tx-copy{flex:1;min-width:0}.tx-title{font-size:11px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tx-meta{font-size:9px;color:#898396;margin-top:3px}.tx-value{font-size:11px;font-weight:700;white-space:nowrap}.empty{font-size:11px;color:#898396;padding:12px 0}.footer{text-align:center;color:#9791a2;font-size:9px;padding:14px 0 22px}
+  </style>
+</head>
+<body>
+  <div id="state" role="status">Validando seu acesso pelo Telegram…</div>
+  <main id="dashboard" hidden>
+    <header><div><h1>Meu orçamento</h1><p>SEU CONTROLE FINANCEIRO</p></div><span id="period" class="muted"></span></header>
+    <section class="hero"><div class="eyebrow">SALDO DISPONÍVEL</div><div id="balance" class="balance">R$ 0,00</div><div class="totals"><div><span>Entradas</span><strong id="income">R$ 0,00</strong></div><div><span>Despesas</span><strong id="expense">R$ 0,00</strong></div></div></section>
+    <section class="card"><div class="section-head"><h2>Gastos do mês</h2><span id="month" class="muted"></span></div><div id="spend-total" class="spend-total"></div><div class="chart-layout"><div id="pie" class="pie" aria-label="Gastos por categoria"></div><div id="legend" class="legend"></div></div></section>
+    <section class="card"><div class="section-head"><h2>Movimentações recentes</h2></div><div id="transactions" class="transactions"></div></section>
+    <div class="footer">Seus dados são privados e vinculados à sua conta do Telegram.</div>
+  </main>
+  <script>
+    const money = value => new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"}).format(value || 0);
+    const colors = ["#7c3aed", "#f472b6", "#0ea5e9", "#f59e0b", "#10b981", "#ef4444"];
+    const state = document.querySelector("#state");
+    function fail(message) { state.textContent = message; }
+    async function api(path, token) {
+      const response = await fetch(path, {headers:{Authorization:"Bearer " + token}});
+      if (!response.ok) throw new Error("Não foi possível carregar seu dashboard.");
+      return response.json();
+    }
+    function renderPie(transactions) {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+      const totals = new Map();
+      for (const tx of transactions) {
+        if (tx.tipo === "DESPESA" && tx.data?.slice(0, 7) === currentMonth) totals.set(tx.nomeCategoria || "Outros", (totals.get(tx.nomeCategoria || "Outros") || 0) + tx.valor);
+      }
+      const entries = [...totals].sort((a,b)=>b[1]-a[1]);
+      const sum = entries.reduce((n,entry)=>n+entry[1],0);
+      document.querySelector("#spend-total").textContent = money(sum) + " em despesas";
+      const pie = document.querySelector("#pie"), legend = document.querySelector("#legend");
+      if (!sum) { pie.style.background="#eeeaf3"; legend.textContent="Sem despesas registradas este mês"; return; }
+      let position=0;
+      const stops=entries.map(([name,value],i)=>{const start=position;position+=value/sum*360;return `${colors[i%colors.length]} ${start}deg ${position}deg`;});
+      pie.style.background=`conic-gradient(${stops.join(",")})`;
+      for(const [i,[name,value]] of entries.entries()){
+        const row=document.createElement("div");row.className="legend-row";
+        const dot=document.createElement("span");dot.className="dot";dot.style.background=colors[i%colors.length];
+        const label=document.createElement("span");label.className="legend-name";label.textContent=name;
+        const amount=document.createElement("span");amount.className="legend-value";amount.textContent=money(value);
+        row.append(dot,label,amount);legend.append(row);
+      }
+    }
+    function renderTransactions(items) {
+      const target=document.querySelector("#transactions");
+      const recent=[...items].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,6);
+      if(!recent.length){target.innerHTML='<div class="empty">Suas movimentações aparecerão aqui.</div>';return;}
+      for(const tx of recent){
+        const row=document.createElement("div");row.className="transaction";
+        const badge=document.createElement("span");badge.className="badge";badge.textContent=tx.tipo==="RECEITA"?"↙":"−";
+        const copy=document.createElement("div");copy.className="tx-copy";
+        const title=document.createElement("div");title.className="tx-title";title.textContent=tx.descricao;
+        const meta=document.createElement("div");meta.className="tx-meta";meta.textContent=(tx.nomeCategoria||"Outros")+" · "+tx.data;
+        const value=document.createElement("div");value.className="tx-value";value.style.color=tx.tipo==="RECEITA"?"#0e9f6e":"#e8436d";value.textContent=(tx.tipo==="RECEITA"?"+ ":"− ")+money(tx.valor);
+        copy.append(title,meta);row.append(badge,copy,value);target.append(row);
+      }
+    }
+    async function start() {
+      const telegram=window.Telegram?.WebApp;
+      if(!telegram?.initData){fail("Abra este dashboard pelo botão fixado na conversa privada do bot.");return;}
+      telegram.ready();telegram.expand();
+      try{
+        const login=await fetch("/auth/telegram/webapp",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({initData:telegram.initData})});
+        if(!login.ok)throw new Error("Não foi possível confirmar sua identidade do Telegram. Reabra o dashboard pelo bot.");
+        const {token}=await login.json();
+        const [summary,items]=await Promise.all([api("/transacoes/dashboard",token),api("/transacoes",token)]);
+        document.querySelector("#balance").textContent=money(summary.saldo);
+        document.querySelector("#income").textContent=money(summary.totalReceitas);
+        document.querySelector("#expense").textContent=money(summary.totalDespesas);
+        const now=new Date();
+        document.querySelector("#period").textContent=now.toLocaleDateString("pt-BR",{month:"short",year:"numeric"});
+        document.querySelector("#month").textContent=now.toLocaleDateString("pt-BR",{month:"long"});
+        renderPie(items);renderTransactions(items);
+        state.hidden=true;document.querySelector("#dashboard").hidden=false;
+      }catch(error){fail(error.message||"Ocorreu um erro ao abrir o dashboard.");}
+    }
+    start();
+  </script>
+</body>
+</html>
