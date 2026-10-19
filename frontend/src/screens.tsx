@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { Link, useNavigate, useOutletContext } from 'react-router'
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router'
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, BriefcaseBusiness, Calendar, Car, Check, ChevronLeft, ChevronRight,
   CircleCheck, Copy, ExternalLink, Eye, EyeOff, Gamepad2, GraduationCap, HeartPulse, House, LogOut, Mail,
   PencilLine, PiggyBank, Plus, Send, Tag, Trash2, UserRound, Utensils, X, type LucideIcon,
 } from 'lucide-react'
-import { api, ApiError, type ResumoCategoria, type ResumoMensal, type Sessao, type Tipo, type Transacao, type VinculoTelegram } from './api'
+import { api, ApiError, type Categoria, type ResumoCategoria, type ResumoMensal, type Sessao, type Tipo, type Transacao, type VinculoTelegram } from './api'
 import type { ScreenContext } from './App'
 
 const money = (value: string) => {
@@ -85,14 +85,16 @@ function CategoryIcon({ name, size = 'md' }: { name: string; size?: 'md' | 'lg' 
 function TransactionRow({ item, onDelete, showDate = true }: { item: Transacao; onDelete?: (item: Transacao) => void; showDate?: boolean }) {
   return (
     <div className="transaction-row">
-      <CategoryIcon name={item.nomeCategoria} />
-      <div className="transaction-copy">
-        <strong>{item.descricao}</strong>
-        <span>{item.nomeCategoria}{showDate && ' · ' + dateLabel(item.data)}</span>
-      </div>
-      <strong className={'transaction-value ' + (item.tipo === 'RECEITA' ? 'income-text' : '')}>
-        {item.tipo === 'RECEITA' ? '+' : '−'} {money(item.valor)}
-      </strong>
+      <Link className="transaction-link" to={'/lancamentos/' + item.id + '/editar'}>
+        <CategoryIcon name={item.nomeCategoria} />
+        <div className="transaction-copy">
+          <strong>{item.descricao}</strong>
+          <span>{item.nomeCategoria}{showDate && ' · ' + dateLabel(item.data)}</span>
+        </div>
+        <strong className={'transaction-value ' + (item.tipo === 'RECEITA' ? 'income-text' : '')}>
+          {item.tipo === 'RECEITA' ? '+' : '−'} {money(item.valor)}
+        </strong>
+      </Link>
       {onDelete && <button className="icon-button delete-button" type="button" onClick={() => onDelete(item)} aria-label={'Excluir ' + item.descricao}><Trash2 size={17} /></button>}
     </div>
   )
@@ -521,7 +523,11 @@ export function TransactionsPage() {
 export function TransactionFormPage() {
   const { session, onUnauthorized, notify } = useScreen()
   const navigate = useNavigate()
-  const [categories, setCategories] = useState<{ id: number; nome: string; tipo: Tipo }[] | null>(null)
+  const location = useLocation()
+  const { id } = useParams()
+  const [categories, setCategories] = useState<Categoria[] | null>(null)
+  const [loaded, setLoaded] = useState(!id)
+  const [loadError, setLoadError] = useState('')
   const [type, setType] = useState<Tipo>('DESPESA')
   const [amountDigits, setAmountDigits] = useState('')
   const amountInput = useRef<HTMLInputElement>(null)
@@ -538,11 +544,26 @@ export function TransactionFormPage() {
 
   useEffect(() => {
     let active = true
-    api<{ id: number; nome: string; tipo: Tipo }[]>('/categorias', {}, session.token)
-      .then((result) => { if (active) setCategories(result) })
-      .catch((err: unknown) => { if (active) requestError(err, onUnauthorized, setError) })
+    Promise.all([api<Categoria[]>('/categorias', {}, session.token), id ? api<Transacao[]>('/transacoes', {}, session.token) : null])
+      .then(([result, transactions]) => {
+        if (!active) return
+        setCategories(result)
+        if (!transactions) return
+        const item = transactions.find((entry) => String(entry.id) === id)
+        if (!item) {
+          setLoadError('Lançamento não encontrado.')
+          return
+        }
+        setType(result.find((category) => category.id === item.categoriaId)?.tipo ?? item.tipo)
+        setAmountDigits(cents(item.valor).toString().replace(/^0+/, ''))
+        setDescription(item.descricao)
+        setCategoryId(String(item.categoriaId))
+        setDate(item.data)
+        setLoaded(true)
+      })
+      .catch((err: unknown) => { if (active) requestError(err, onUnauthorized, id ? setLoadError : setError) })
     return () => { active = false }
-  }, [session.token, onUnauthorized])
+  }, [id, session.token, onUnauthorized])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -557,12 +578,14 @@ export function TransactionFormPage() {
     }
     setBusy(true)
     try {
-      await api('/transacoes', {
-        method: 'POST',
+      await api(id ? '/transacoes/' + id : '/transacoes', {
+        method: id ? 'PUT' : 'POST',
         body: JSON.stringify({ valor: decimalFromCents(BigInt(amountDigits)), descricao: description.trim(), data: date, categoriaId: Number(categoryId) }),
       }, session.token)
-      notify('Lançamento salvo.')
-      navigate('/')
+      notify(id ? 'Lançamento atualizado.' : 'Lançamento salvo.')
+      if (!id) navigate('/')
+      else if (location.key === 'default') navigate('/extrato', { replace: true })
+      else navigate(-1)
     } catch (err) {
       requestError(err, onUnauthorized, setError)
     } finally {
@@ -577,46 +600,48 @@ export function TransactionFormPage() {
     <div className="page-content">
       <header className="form-header">
         <button className="round-button" type="button" onClick={() => navigate(-1)} aria-label="Voltar"><ChevronLeft size={19} /></button>
-        <h1>Novo lançamento</h1>
-        <Link className="round-button" to="/" aria-label="Cancelar"><X size={18} /></Link>
+        <h1>{id ? 'Editar lançamento' : 'Novo lançamento'}</h1>
+        <Link className="round-button" to={id ? '/extrato' : '/'} aria-label="Cancelar"><X size={18} /></Link>
       </header>
-      <div className={'segmented type-toggle ' + type.toLowerCase()} role="group" aria-label="Tipo do lançamento">
-        <button type="button" className={type === 'DESPESA' ? 'selected' : ''} aria-pressed={type === 'DESPESA'} onClick={() => { setType('DESPESA'); setCategoryId('') }}><ArrowUpRight size={16} /> Despesa</button>
-        <button type="button" className={type === 'RECEITA' ? 'selected' : ''} aria-pressed={type === 'RECEITA'} onClick={() => { setType('RECEITA'); setCategoryId('') }}><ArrowDownLeft size={16} /> Receita</button>
-      </div>
-      <form className="form-stack" onSubmit={submit}>
-        <label className="amount-input">
-          <span>Valor da {type === 'DESPESA' ? 'despesa' : 'receita'}</span>
-          <span className="amount-value"><small>R$</small><input ref={amountInput} value={moneyFromCents(BigInt(amountDigits || '0')).replace('R$ ', '')}
-            onChange={(event) => setAmountDigits(event.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 19))}
-            onFocus={(event) => keepCaretAtEnd(event.currentTarget)} onClick={(event) => keepCaretAtEnd(event.currentTarget)}
-            inputMode="numeric" aria-label="Valor em reais" aria-describedby="amount-help" size={Math.max(4, moneyFromCents(BigInt(amountDigits || '0')).length - 3)} /></span>
-          <small id="amount-help">Os dois últimos números são centavos</small>
-        </label>
-        <fieldset className="category-picker">
-          <legend><span>Categoria</span><Link to="/categorias">Gerenciar</Link></legend>
-          {!categories ? <p className="loading">Carregando categorias...</p> : <div className="category-grid">
-            {available.map((category) => <label key={category.id} className={'category-tile' + (String(category.id) === categoryId ? ' selected' : '')}>
-              <input type="radio" name="categoria" value={category.id} checked={String(category.id) === categoryId} onChange={() => setCategoryId(String(category.id))} />
-              <CategoryIcon name={category.nome} size="lg" />
-              <span>{category.nome}</span>
-            </label>)}
-            <Link className="category-tile add" to="/categorias/nova"><span className="category-icon lg neutral"><Plus size={19} /></span><span>Nova</span></Link>
-          </div>}
-          {categories && !available.length && <p className="form-note">Crie uma categoria de {type === 'DESPESA' ? 'despesa' : 'receita'} para continuar.</p>}
-        </fieldset>
-        <label className="field"><span>Descrição</span><div><PencilLine size={18} /><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex.: Compras no mercado" maxLength={255} required /></div></label>
-        <div className="field date-field"><span id="date-label">Data</span>
-          <div className="date-options" role="group" aria-labelledby="date-label">
-            <button type="button" className={date === today() ? 'selected' : ''} aria-pressed={date === today()} onClick={() => setDate(today())}>Hoje</button>
-            <button type="button" className={date === yesterday() ? 'selected' : ''} aria-pressed={date === yesterday()} onClick={() => setDate(yesterday())}>Ontem</button>
-            <label className={'date-picker' + (date !== today() && date !== yesterday() ? ' selected' : '')}><Calendar size={16} aria-hidden="true" />
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required aria-label="Escolher data" /></label>
-          </div>
+      {loadError ? <ErrorState message={loadError} /> : !loaded ? <p className="loading">Carregando lançamento...</p> : <>
+        <div className={'segmented type-toggle ' + type.toLowerCase()} role="group" aria-label="Tipo do lançamento">
+          <button type="button" className={type === 'DESPESA' ? 'selected' : ''} aria-pressed={type === 'DESPESA'} onClick={() => { setType('DESPESA'); setCategoryId('') }}><ArrowUpRight size={16} /> Despesa</button>
+          <button type="button" className={type === 'RECEITA' ? 'selected' : ''} aria-pressed={type === 'RECEITA'} onClick={() => { setType('RECEITA'); setCategoryId('') }}><ArrowDownLeft size={16} /> Receita</button>
         </div>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="submit" disabled={busy || !categories || !available.length}><Check size={19} /> {busy ? 'Salvando...' : type === 'DESPESA' ? 'Salvar despesa' : 'Salvar receita'}</button>
-      </form>
+        <form className="form-stack" onSubmit={submit}>
+          <label className="amount-input">
+            <span>Valor da {type === 'DESPESA' ? 'despesa' : 'receita'}</span>
+            <span className="amount-value"><small>R$</small><input ref={amountInput} value={moneyFromCents(BigInt(amountDigits || '0')).replace('R$ ', '')}
+              onChange={(event) => setAmountDigits(event.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 19))}
+              onFocus={(event) => keepCaretAtEnd(event.currentTarget)} onClick={(event) => keepCaretAtEnd(event.currentTarget)}
+              inputMode="numeric" aria-label="Valor em reais" aria-describedby="amount-help" size={Math.max(4, moneyFromCents(BigInt(amountDigits || '0')).length - 3)} /></span>
+            <small id="amount-help">Os dois últimos números são centavos</small>
+          </label>
+          <fieldset className="category-picker">
+            <legend><span>Categoria</span><Link to="/categorias">Gerenciar</Link></legend>
+            {!categories ? <p className="loading">Carregando categorias...</p> : <div className="category-grid">
+              {available.map((category) => <label key={category.id} className={'category-tile' + (String(category.id) === categoryId ? ' selected' : '')}>
+                <input type="radio" name="categoria" value={category.id} checked={String(category.id) === categoryId} onChange={() => setCategoryId(String(category.id))} />
+                <CategoryIcon name={category.nome} size="lg" />
+                <span>{category.nome}</span>
+              </label>)}
+              <Link className="category-tile add" to="/categorias/nova"><span className="category-icon lg neutral"><Plus size={19} /></span><span>Nova</span></Link>
+            </div>}
+            {categories && !available.length && <p className="form-note">Crie uma categoria de {type === 'DESPESA' ? 'despesa' : 'receita'} para continuar.</p>}
+          </fieldset>
+          <label className="field"><span>Descrição</span><div><PencilLine size={18} /><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex.: Compras no mercado" maxLength={255} required /></div></label>
+          <div className="field date-field"><span id="date-label">Data</span>
+            <div className="date-options" role="group" aria-labelledby="date-label">
+              <button type="button" className={date === today() ? 'selected' : ''} aria-pressed={date === today()} onClick={() => setDate(today())}>Hoje</button>
+              <button type="button" className={date === yesterday() ? 'selected' : ''} aria-pressed={date === yesterday()} onClick={() => setDate(yesterday())}>Ontem</button>
+              <label className={'date-picker' + (date !== today() && date !== yesterday() ? ' selected' : '')}><Calendar size={16} aria-hidden="true" />
+                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required aria-label="Escolher data" /></label>
+            </div>
+          </div>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary-button" type="submit" disabled={busy || !categories || !available.length}><Check size={19} /> {busy ? 'Salvando...' : id ? 'Salvar alterações' : type === 'DESPESA' ? 'Salvar despesa' : 'Salvar receita'}</button>
+        </form>
+      </>}
     </div>
   )
 }
@@ -659,12 +684,12 @@ export function CategoriesPage() {
         <div className="category-cards">
           {group.map((item) => {
             const total = cents(item.total)
-            return <article className="card category-card" key={item.id}>
+            return <Link className="card category-card" key={item.id} to={'/categorias/' + item.id + '/editar'}>
               <CategoryIcon name={item.nome} size="lg" />
               <div><h3>{item.nome}</h3><span>{item.quantidade ? item.quantidade + (item.quantidade === 1 ? ' lançamento' : ' lançamentos') : 'Sem lançamentos'}</span></div>
               <strong className={total ? '' : 'muted'}>{money(item.total)}</strong>
               <span className="progress" aria-label={share(total, groupTotal).toLocaleString('pt-BR') + '% do total'}><i style={{ width: share(total, groupTotal) + '%', background: categoryStyle(item.nome).color }} /></span>
-            </article>
+            </Link>
           })}
           <Link className="category-card add" to="/categorias/nova"><span><Plus size={18} /></span>Nova categoria</Link>
         </div>
@@ -739,10 +764,43 @@ const nameSuggestions: Record<Tipo, string[]> = {
 export function CategoryFormPage() {
   const { session, onUnauthorized, notify } = useScreen()
   const navigate = useNavigate()
+  const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const [categories, setCategories] = useState<Categoria[] | null>(null)
+  const [loadError, setLoadError] = useState('')
   const [name, setName] = useState('')
-  const [type, setType] = useState<Tipo>('DESPESA')
+  const [type, setType] = useState<Tipo>(searchParams.get('tipo') === 'RECEITA' ? 'RECEITA' : 'DESPESA')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [target, setTarget] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const dialog = useRef<HTMLDialogElement>(null)
+  const current = categories?.find((category) => String(category.id) === id)
+
+  useEffect(() => {
+    if (!id) return
+    let active = true
+    api<Categoria[]>('/categorias', {}, session.token)
+      .then((result) => {
+        if (!active) return
+        const category = result.find((item) => String(item.id) === id)
+        if (!category) {
+          setLoadError('Categoria não encontrada.')
+          return
+        }
+        setCategories(result)
+        setName(category.nome)
+        setType(category.tipo)
+      })
+      .catch((err: unknown) => { if (active) requestError(err, onUnauthorized, setLoadError) })
+    return () => { active = false }
+  }, [id, session.token, onUnauthorized])
+
+  useEffect(() => {
+    if (deleting && !dialog.current?.open) dialog.current?.showModal()
+    if (!deleting && dialog.current?.open) dialog.current?.close()
+  }, [deleting])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -753,8 +811,8 @@ export function CategoryFormPage() {
     setBusy(true)
     setError('')
     try {
-      await api('/categorias', { method: 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type }) }, session.token)
-      notify('Categoria criada.')
+      await api(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type }) }, session.token)
+      notify(id ? 'Categoria atualizada.' : 'Categoria criada.')
       navigate('/categorias')
     } catch (err) {
       requestError(err, onUnauthorized, setError)
@@ -763,39 +821,83 @@ export function CategoryFormPage() {
     }
   }
 
+  async function remove() {
+    if (!current) return
+    setBusy(true)
+    setDeleteError('')
+    try {
+      await api<void>('/categorias/' + current.id + (current.quantidadeLancamentos ? '?moverPara=' + target : ''), { method: 'DELETE' }, session.token)
+      notify('Categoria excluída.')
+      navigate('/categorias', { replace: true })
+    } catch (err) {
+      requestError(err, onUnauthorized, setDeleteError)
+      setBusy(false)
+    }
+  }
+
   const preview = name.trim() || (type === 'DESPESA' ? 'Nova despesa' : 'Nova receita')
   const { Icon: PreviewIcon, color: previewColor } = categoryStyle(preview)
+  const used = current?.quantidadeLancamentos ?? 0
+  const usedLabel = used + (used === 1 ? ' lançamento' : ' lançamentos')
+  const destinations = categories?.filter((category) => category.tipo === current?.tipo && category.id !== current?.id) ?? []
+  const typeLabel = (value: Tipo) => value === 'DESPESA' ? 'despesa' : 'receita'
 
   return (
     <div className="page-content">
       <header className="form-header">
         <button className="round-button" type="button" onClick={() => navigate(-1)} aria-label="Voltar"><ChevronLeft size={19} /></button>
-        <h1>Nova categoria</h1>
+        <h1>{id ? 'Editar categoria' : 'Nova categoria'}</h1>
         <Link className="round-button" to="/categorias" aria-label="Cancelar"><X size={18} /></Link>
       </header>
-      <section className={'category-preview ' + type.toLowerCase()} aria-label="Prévia da categoria">
-        <span className="category-preview-icon" style={{ '--category': previewColor } as CSSProperties}><PreviewIcon size={30} aria-hidden="true" /></span>
-        <strong>{preview}</strong>
-        <span className="category-preview-type">{type === 'DESPESA' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />} {type === 'DESPESA' ? 'Despesa' : 'Receita'}</span>
-      </section>
-      <form className="form-stack" onSubmit={submit}>
-        <fieldset className="category-choice"><legend>Tipo da categoria</legend>
-          {(['DESPESA', 'RECEITA'] as const).map((value) => <label className={'choice ' + value.toLowerCase() + (type === value ? ' selected' : '')} key={value}>
-            <input type="radio" name="tipo" checked={type === value} onChange={() => setType(value)} />
-            <span className="choice-icon">{value === 'DESPESA' ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}</span>
-            <span><strong>{value === 'DESPESA' ? 'Despesa' : 'Receita'}</strong><small>{value === 'DESPESA' ? 'Para gastos e pagamentos' : 'Para dinheiro que entra'}</small></span>
-            <CircleCheck className="choice-check" size={21} />
-          </label>)}
-        </fieldset>
-        <label className="field"><span>Nome da categoria</span><div><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Saúde" maxLength={100} required /><Tag size={18} /></div></label>
-        <div className="name-suggestions" role="group" aria-label="Sugestões de nome">
-          {nameSuggestions[type].map((suggestion) => <button type="button" key={suggestion} className={name.trim() === suggestion ? 'selected' : ''} onClick={() => setName(suggestion)}>
-            <CategoryIcon name={suggestion} />{suggestion}
-          </button>)}
+      {loadError ? <ErrorState message={loadError} /> : id && !current ? <p className="loading">Carregando categoria...</p> : <>
+        <section className={'category-preview ' + type.toLowerCase()} aria-label="Prévia da categoria">
+          <span className="category-preview-icon" style={{ '--category': previewColor } as CSSProperties}><PreviewIcon size={30} aria-hidden="true" /></span>
+          <strong>{preview}</strong>
+          <span className="category-preview-type">{type === 'DESPESA' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />} {type === 'DESPESA' ? 'Despesa' : 'Receita'}</span>
+        </section>
+        <form className="form-stack" onSubmit={submit}>
+          <fieldset className="category-choice" aria-describedby={used ? 'type-locked' : undefined}><legend>Tipo da categoria</legend>
+            {(['DESPESA', 'RECEITA'] as const).map((value) => {
+              const locked = used > 0 && value !== current?.tipo
+              return <label className={'choice ' + value.toLowerCase() + (type === value ? ' selected' : '') + (locked ? ' disabled' : '')} key={value}>
+                <input type="radio" name="tipo" checked={type === value} disabled={locked} onChange={() => setType(value)} />
+                <span className="choice-icon">{value === 'DESPESA' ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}</span>
+                <span><strong>{value === 'DESPESA' ? 'Despesa' : 'Receita'}</strong><small>{value === 'DESPESA' ? 'Para gastos e pagamentos' : 'Para dinheiro que entra'}</small></span>
+                <CircleCheck className="choice-check" size={21} />
+              </label>
+            })}
+            {used > 0 && <p className="form-note choice-note" id="type-locked">O tipo não pode ser alterado porque a categoria já tem {usedLabel}.</p>}
+          </fieldset>
+          <label className="field"><span>Nome da categoria</span><div><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Saúde" maxLength={100} required /><Tag size={18} /></div></label>
+          <div className="name-suggestions" role="group" aria-label="Sugestões de nome">
+            {nameSuggestions[type].map((suggestion) => <button type="button" key={suggestion} className={name.trim() === suggestion ? 'selected' : ''} onClick={() => setName(suggestion)}>
+              <CategoryIcon name={suggestion} />{suggestion}
+            </button>)}
+          </div>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary-button" type="submit" disabled={busy}><Check size={18} /> {busy ? 'Salvando...' : id ? 'Salvar alterações' : 'Salvar categoria'}</button>
+          {current && <button className="danger-outline" type="button" onClick={() => { setDeleteError(''); setTarget(''); setDeleting(true) }} disabled={busy}><Trash2 size={17} /> Excluir categoria</button>}
+        </form>
+      </>}
+      <dialog ref={dialog} className="confirm-dialog" onClose={() => setDeleting(false)} aria-labelledby="delete-category-title">
+        <span className="dialog-icon"><Trash2 size={23} /></span>
+        <h2 id="delete-category-title">Excluir categoria?</h2>
+        {!used ? <p>{current?.nome} será removida. Ela não tem lançamentos.</p> : destinations.length ? <>
+          <p>{usedLabel} {used === 1 ? 'será movido' : 'serão movidos'} para:</p>
+          <div className="category-grid move-grid" role="radiogroup" aria-label="Categoria de destino">
+            {destinations.map((category) => <label key={category.id} className={'category-tile' + (String(category.id) === target ? ' selected' : '')}>
+              <input type="radio" name="destino" value={category.id} checked={String(category.id) === target} onChange={() => setTarget(String(category.id))} />
+              <CategoryIcon name={category.nome} size="lg" />
+              <span>{category.nome}</span>
+            </label>)}
+          </div>
+        </> : <p>{current?.nome} tem {usedLabel}. Para excluí-la, primeiro <Link className="inline-link" to={'/categorias/nova?tipo=' + current?.tipo}>crie outra categoria de {typeLabel(current?.tipo ?? 'DESPESA')}</Link> para recebê-{used === 1 ? 'lo' : 'los'}.</p>}
+        {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+        <div className="dialog-actions">
+          <button type="button" onClick={() => setDeleting(false)} disabled={busy}>Cancelar</button>
+          <button type="button" className="danger-button" onClick={remove} disabled={busy || (used > 0 && !target)}>{busy ? 'Excluindo...' : 'Excluir'}</button>
         </div>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="submit" disabled={busy}><Check size={18} /> {busy ? 'Salvando...' : 'Salvar categoria'}</button>
-      </form>
+      </dialog>
     </div>
   )
 }

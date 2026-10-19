@@ -6,6 +6,7 @@ public class CategoriaResponseDTO {
     private Long id;
     private String nome;
     private TipoTransacao tipo;
+    private long quantidadeLancamentos;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -13,4 +14,6 @@ public class CategoriaResponseDTO {
     public void setNome(String nome) { this.nome = nome; }
     public TipoTransacao getTipo() { return tipo; }
     public void setTipo(TipoTransacao tipo) { this.tipo = tipo; }
+    public long getQuantidadeLancamentos() { return quantidadeLancamentos; }
+    public void setQuantidadeLancamentos(long quantidadeLancamentos) { this.quantidadeLancamentos = quantidadeLancamentos; }
 }

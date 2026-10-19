@@ -44,7 +44,7 @@ public class TelegramLinkService {
         this.transacaoRepository = transacaoRepository;
         this.objectMapper = objectMapper;
         this.botToken = botToken;
-        this.botUsername = botUsername.replaceFirst("^@", "").trim();
+        this.botUsername = botUsername.trim().replaceFirst("^@", "");
     }
 
     @Transactional

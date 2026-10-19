@@ -5,6 +5,7 @@ import hanrry.cdg.dtos.TransacaoResponseDTO;
 import hanrry.cdg.models.Transacao;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring")
 public interface TransacaoMapper {
@@ -15,6 +16,13 @@ public interface TransacaoMapper {
     @Mapping(target = "tipo", ignore = true)
     Transacao toEntity(TransacaoRequestDTO dto);
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "categoria", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "tipo", ignore = true)
+    void atualizar(TransacaoRequestDTO dto, @MappingTarget Transacao entity);
+
+    @Mapping(target = "categoriaId", source = "categoria.id")
     @Mapping(target = "nomeCategoria", source = "categoria.nome")
     @Mapping(target = "tipo", source = "categoria.tipo")
     TransacaoResponseDTO toDto(Transacao entity);

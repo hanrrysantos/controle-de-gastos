@@ -10,6 +10,7 @@ public class TransacaoResponseDTO {
     private BigDecimal valor;
     private String descricao;
     private LocalDate data;
+    private Long categoriaId;
     private String nomeCategoria;
     private String tipo;
 
@@ -26,6 +27,9 @@ public class TransacaoResponseDTO {
 
     public LocalDate getData() { return data; }
     public void setData(LocalDate data) { this.data = data; }
+
+    public Long getCategoriaId() { return categoriaId; }
+    public void setCategoriaId(Long categoriaId) { this.categoriaId = categoriaId; }
 
     public String getNomeCategoria() { return nomeCategoria; }
     public void setNomeCategoria(String nomeCategoria) { this.nomeCategoria = nomeCategoria; }

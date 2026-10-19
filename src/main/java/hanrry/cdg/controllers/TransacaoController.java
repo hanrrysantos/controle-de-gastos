@@ -44,6 +44,11 @@ public class TransacaoController {
         return ResponseEntity.ok(service.getResumoMensal(mes));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<TransacaoResponseDTO> atualizar(@PathVariable Long id, @RequestBody TransacaoRequestDTO dto) {
+        return ResponseEntity.ok(service.atualizar(id, dto));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);

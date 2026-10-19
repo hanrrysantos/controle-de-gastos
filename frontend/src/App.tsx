@@ -89,8 +89,10 @@ function App() {
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
           <Route path="/extrato" element={<TransactionsPage />} />
           <Route path="/novo" element={<TransactionFormPage />} />
+          <Route path="/lancamentos/:id/editar" element={<TransactionFormPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/categorias/nova" element={<CategoryFormPage />} />
+          <Route path="/categorias/:id/editar" element={<CategoryFormPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>}

@@ -34,4 +34,15 @@ public class CategoriaController {
         List<CategoriaResponseDTO> categorias = service.listar();
         return ResponseEntity.ok(categorias);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<CategoriaResponseDTO> atualizar(@PathVariable Long id, @RequestBody CategoriaCreateDTO dto) {
+        return ResponseEntity.ok(service.atualizar(id, dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletar(@PathVariable Long id, @RequestParam(required = false) Long moverPara) {
+        service.deletar(id, moverPara);
+        return ResponseEntity.noContent().build();
+    }
 }
