@@ -169,7 +169,7 @@
 .field > span { color: var(--text-2); font-size: 12px; }
 .field > div { min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
 .field > div:focus-within { border-color: var(--accent); }
-.field input, .field select { flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 15px; }
+.field input, .field select { flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 16px; }
 .field input::placeholder { color: var(--text-3); }
 .field select { appearance: none; }
 .field svg { flex: 0 0 auto; color: var(--text-3); }
@@ -177,7 +177,7 @@
 .date-field .date-options { min-height: 0; display: flex; gap: 8px; padding: 0; border: 0; background: transparent; }
 .date-options > button, .date-picker { height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid var(--border); border-radius: 14px; color: var(--text-2); background: var(--surface); font-size: 13px; font-weight: 500; }
 .date-picker { min-width: 0; flex: 1; padding: 0 12px; cursor: pointer; }
-.date-picker input { font-size: 13px; color: inherit; }
+.date-picker input { font-size: 16px; color: inherit; }
 .date-options .selected { border-color: var(--accent); color: var(--on-accent); background: var(--accent); font-weight: 600; }
 .date-options .selected svg { color: var(--on-accent); }
 .date-picker input::-webkit-calendar-picker-indicator { display: none; }
@@ -283,10 +283,10 @@
 .move-grid { margin: -8px 0 20px; }
 .move-grid .category-tile { box-shadow: none; border-color: var(--border); }
 .move-grid .category-tile.selected { border-color: var(--accent); }
-.toast { position: fixed; z-index: 50; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(350px, calc(100% - 32px)); padding: 14px 18px; border-radius: 16px; color: #fff; background: var(--text); box-shadow: 0 10px 25px #17172033; font-size: 13px; font-weight: 500; text-align: center; animation: toast-enter .22s ease-out; }
+.toast { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); pointer-events: none; width: min(350px, calc(100% - 32px)); padding: 14px 18px; border-radius: 16px; color: #fff; background: var(--text); box-shadow: 0 10px 25px #17172033; font-size: 13px; font-weight: 500; text-align: center; animation: toast-enter .22s ease-out; }
 
 @keyframes page-enter { from { opacity: .6; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toast-enter { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toast-enter { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes chart-enter { from { opacity: .5; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 @keyframes bubble-enter { from { opacity: 0; transform: translate(-50%, -50%) scale(.6); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes sheet-enter { from { transform: translateY(40px); opacity: .4; } to { transform: translateY(0); opacity: 1; } }

@@ -520,20 +520,24 @@ export function TransactionsPage() {
   )
 }
 
+type Rascunho = { type: Tipo; amountDigits: string; description: string; categoryId: string; date: string }
+type RetornoCategoria = { voltarPara: string; rascunho: Rascunho }
+
 export function TransactionFormPage() {
   const { session, onUnauthorized, notify } = useScreen()
   const navigate = useNavigate()
   const location = useLocation()
   const { id } = useParams()
+  const [draft] = useState(() => (location.state as { rascunho?: Rascunho } | null)?.rascunho)
   const [categories, setCategories] = useState<Categoria[] | null>(null)
-  const [loaded, setLoaded] = useState(!id)
+  const [loaded, setLoaded] = useState(!id || !!draft)
   const [loadError, setLoadError] = useState('')
-  const [type, setType] = useState<Tipo>('DESPESA')
-  const [amountDigits, setAmountDigits] = useState('')
+  const [type, setType] = useState<Tipo>(draft?.type ?? 'DESPESA')
+  const [amountDigits, setAmountDigits] = useState(draft?.amountDigits ?? '')
   const amountInput = useRef<HTMLInputElement>(null)
-  const [description, setDescription] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [date, setDate] = useState(today)
+  const [description, setDescription] = useState(draft?.description ?? '')
+  const [categoryId, setCategoryId] = useState(draft?.categoryId ?? '')
+  const [date, setDate] = useState(draft?.date ?? today())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -544,7 +548,7 @@ export function TransactionFormPage() {
 
   useEffect(() => {
     let active = true
-    Promise.all([api<Categoria[]>('/categorias', {}, session.token), id ? api<Transacao[]>('/transacoes', {}, session.token) : null])
+    Promise.all([api<Categoria[]>('/categorias', {}, session.token), id && !draft ? api<Transacao[]>('/transacoes', {}, session.token) : null])
       .then(([result, transactions]) => {
         if (!active) return
         setCategories(result)
@@ -563,7 +567,14 @@ export function TransactionFormPage() {
       })
       .catch((err: unknown) => { if (active) requestError(err, onUnauthorized, id ? setLoadError : setError) })
     return () => { active = false }
-  }, [id, session.token, onUnauthorized])
+  }, [id, draft, session.token, onUnauthorized])
+
+  function createCategory(event: ReactMouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    const rascunho: Rascunho = { type, amountDigits, description, categoryId, date }
+    navigate(location.pathname, { replace: true, state: { rascunho } })
+    navigate('/categorias/nova?tipo=' + type, { state: { voltarPara: location.pathname, rascunho } satisfies RetornoCategoria })
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -625,7 +636,7 @@ export function TransactionFormPage() {
                 <CategoryIcon name={category.nome} size="lg" />
                 <span>{category.nome}</span>
               </label>)}
-              <Link className="category-tile add" to="/categorias/nova"><span className="category-icon lg neutral"><Plus size={19} /></span><span>Nova</span></Link>
+              <Link className="category-tile add" to={'/categorias/nova?tipo=' + type} onClick={createCategory}><span className="category-icon lg neutral"><Plus size={19} /></span><span>Nova</span></Link>
             </div>}
             {categories && !available.length && <p className="form-note">Crie uma categoria de {type === 'DESPESA' ? 'despesa' : 'receita'} para continuar.</p>}
           </fieldset>
@@ -766,6 +777,8 @@ export function CategoryFormPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const retorno = (location.state as RetornoCategoria | null) ?? undefined
   const [categories, setCategories] = useState<Categoria[] | null>(null)
   const [loadError, setLoadError] = useState('')
   const [name, setName] = useState('')
@@ -811,9 +824,10 @@ export function CategoryFormPage() {
     setBusy(true)
     setError('')
     try {
-      await api(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type }) }, session.token)
+      const saved = await api<Categoria>(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type }) }, session.token)
       notify(id ? 'Categoria atualizada.' : 'Categoria criada.')
-      navigate('/categorias')
+      if (retorno) navigate(retorno.voltarPara, { replace: true, state: { rascunho: { ...retorno.rascunho, type: saved.tipo, categoryId: String(saved.id) } } })
+      else navigate('/categorias')
     } catch (err) {
       requestError(err, onUnauthorized, setError)
     } finally {
@@ -847,7 +861,8 @@ export function CategoryFormPage() {
       <header className="form-header">
         <button className="round-button" type="button" onClick={() => navigate(-1)} aria-label="Voltar"><ChevronLeft size={19} /></button>
         <h1>{id ? 'Editar categoria' : 'Nova categoria'}</h1>
-        <Link className="round-button" to="/categorias" aria-label="Cancelar"><X size={18} /></Link>
+        {retorno ? <button className="round-button" type="button" onClick={() => navigate(-1)} aria-label="Cancelar"><X size={18} /></button>
+          : <Link className="round-button" to="/categorias" aria-label="Cancelar"><X size={18} /></Link>}
       </header>
       {loadError ? <ErrorState message={loadError} /> : id && !current ? <p className="loading">Carregando categoria...</p> : <>
         <section className={'category-preview ' + type.toLowerCase()} aria-label="Prévia da categoria">
