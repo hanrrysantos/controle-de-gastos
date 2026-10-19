@@ -14,5 +14,5 @@ public interface CategoriaMapper {
     @Mapping(target = "transacoes", ignore = true)
     Categoria toEntity(CategoriaCreateDTO dto);
 
-    CategoriaResponseDTO toDto(Categoria entity);
+    CategoriaResponseDTO toDto(Categoria entity, long quantidadeLancamentos);
 }

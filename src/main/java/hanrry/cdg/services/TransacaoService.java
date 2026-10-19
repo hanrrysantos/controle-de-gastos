@@ -48,22 +48,10 @@ public class TransacaoService {
     }
 
     public TransacaoResponseDTO criar(TransacaoRequestDTO dto) {
-        if (dto.getValor() == null || dto.getValor().signum() <= 0 || dto.getValor().stripTrailingZeros().scale() > 2
-                || dto.getValor().precision() - dto.getValor().scale() > 17) {
-            throw new BusinessRuleException("O valor deve ser positivo, ter no máximo duas casas decimais e caber no limite monetário.");
-        }
-        if (dto.getCategoriaId() == null || dto.getData() == null || dto.getDescricao() == null || dto.getDescricao().isBlank()) {
-            throw new BusinessRuleException("Preencha descrição, data e categoria.");
-        }
+        validar(dto);
         Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado."));
-
-        Categoria categoria = categoriaRepository.findById(dto.getCategoriaId())
-                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada com ID: " + dto.getCategoriaId()));
-
-        if (!categoria.getUser().getId().equals(user.getId())) {
-            throw new AccessDeniedException("Você não tem permissão para utilizar ou visualizar este recurso.");
-        }
+        Categoria categoria = buscarCategoria(dto.getCategoriaId(), user);
 
         Transacao transacao = mapper.toEntity(dto);
         transacao.setUser(user);
@@ -72,6 +60,47 @@ public class TransacaoService {
 
         Transacao salva = repository.save(transacao);
         return mapper.toDto(salva);
+    }
+
+    public TransacaoResponseDTO atualizar(Long id, TransacaoRequestDTO dto) {
+        validar(dto);
+        Long userId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        User user = userRepository.findById(userId).orElseThrow();
+
+        Transacao transacao = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada."));
+
+        if (!transacao.getUser().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Você não tem permissão para editar este lançamento.");
+        }
+
+        Categoria categoria = buscarCategoria(dto.getCategoriaId(), user);
+        mapper.atualizar(dto, transacao);
+        transacao.setCategoria(categoria);
+        transacao.setTipo(categoria.getTipo());
+
+        Transacao salva = repository.save(transacao);
+        return mapper.toDto(salva);
+    }
+
+    private static void validar(TransacaoRequestDTO dto) {
+        if (dto.getValor() == null || dto.getValor().signum() <= 0 || dto.getValor().stripTrailingZeros().scale() > 2
+                || dto.getValor().precision() - dto.getValor().scale() > 17) {
+            throw new BusinessRuleException("O valor deve ser positivo, ter no máximo duas casas decimais e caber no limite monetário.");
+        }
+        if (dto.getCategoriaId() == null || dto.getData() == null || dto.getDescricao() == null || dto.getDescricao().isBlank()) {
+            throw new BusinessRuleException("Preencha descrição, data e categoria.");
+        }
+    }
+
+    private Categoria buscarCategoria(Long categoriaId, User user) {
+        Categoria categoria = categoriaRepository.findById(categoriaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada com ID: " + categoriaId));
+
+        if (!categoria.getUser().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Você não tem permissão para utilizar ou visualizar este recurso.");
+        }
+        return categoria;
     }
 
     public List<TransacaoResponseDTO> listar() {

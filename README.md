@@ -77,7 +77,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Abra `http://localhost:5173`. Durante o desenvolvimento, o Vite encaminha `/api` para `http://localhost:8080`. Para outra porta local, use `CDG_API_PROXY` conforme o [README do frontend](frontend/README.md). O login recebe `token` e `nome`; o token expira após 24 horas e a sessão do navegador é guardada por aba. A API devolve valores monetários como texto decimal para preservar os centavos no navegador.
+Abra `http://localhost:5173`. Para rodar os testes do frontend, use `npm test`; os da API rodam com `bash mvnw test` (o `CdgApplicationTests` precisa do MySQL ativo). Durante o desenvolvimento, o Vite encaminha `/api` para `http://localhost:8080`. Para outra porta local, use `CDG_API_PROXY` conforme o [README do frontend](frontend/README.md). O login recebe `token` e `nome`; o token expira após 24 horas e a sessão do navegador é guardada por aba. A API devolve valores monetários como texto decimal para preservar os centavos no navegador.
 
 ### 3. Conecte o Telegram
 Configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` (nome do bot, sem `@`) e `GEMINI_API_KEY` no ambiente da API. `CDG_WEB_URL` deve apontar para a URL HTTPS pública do frontend, sem barra final. Cadastre no Telegram o webhook público `POST /integracoes/telegram/webhook` usando o mesmo segredo em `secret_token`.
@@ -139,8 +139,12 @@ Documentação das rotas disponíveis na API REST.
 | `GET` | `/transacoes/dashboard` | Retorna o resumo financeiro (Saldo, Receitas, Despesas) |
 | `GET` | `/transacoes/resumo?mes=AAAA-MM` | Resumo do mês: totais, comparação com o mês anterior, saldo acumulado e total por categoria |
 | `POST` | `/transacoes` | Cria nova receita ou despesa |
+| `PUT` | `/transacoes/{id}` | Edita valor, descrição, data e categoria de um lançamento |
 | `DELETE` | `/transacoes/{id}` | Remove um lançamento |
-| `GET` | `/categorias` | Lista as categorias cadastradas pelo usuário |
+| `GET` | `/categorias` | Lista as categorias cadastradas pelo usuário, com a quantidade de lançamentos de cada uma |
+| `POST` | `/categorias` | Cria uma categoria |
+| `PUT` | `/categorias/{id}` | Renomeia uma categoria; o tipo só muda se ela não tiver lançamentos |
+| `DELETE` | `/categorias/{id}?moverPara={id}` | Exclui uma categoria; se ela tiver lançamentos, `moverPara` indica outra categoria do mesmo tipo para recebê-los |
 
 ---
 
