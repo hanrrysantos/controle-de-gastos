@@ -3,29 +3,42 @@ package hanrry.cdg.services;
 import hanrry.cdg.dtos.TransacaoInterpretadaDTO;
 import hanrry.cdg.exceptions.BusinessRuleException;
 import hanrry.cdg.models.Categoria;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 @Service
 public class GeminiService {
     private final String apiKey;
-    private final String model;
-    private final RestClient restClient = RestClient.create();
+    private static final Set<Integer> FALHAS_TEMPORARIAS = Set.of(429, 500, 502, 503, 504);
+
+    private final List<String> modelos;
+    private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public GeminiService(@Value("${api.gemini.api-key:}") String apiKey,
-                         @Value("${api.gemini.model:gemini-3.1-flash-lite}") String model,
+                         @Value("${api.gemini.model:gemini-3.5-flash-lite,gemini-3.1-flash-lite}") String modelos,
                          ObjectMapper objectMapper) {
+        this(apiKey, modelos, objectMapper, RestClient.builder());
+    }
+
+    GeminiService(String apiKey, String modelos, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
         this.apiKey = apiKey;
-        this.model = model;
+        this.restClient = restClientBuilder.build();
+        this.modelos = Arrays.stream(modelos.split(",")).map(String::trim).filter(m -> !m.isEmpty()).toList();
         this.objectMapper = objectMapper;
     }
 
@@ -62,12 +75,7 @@ public class GeminiService {
                 "generationConfig", Map.of("responseMimeType", "application/json", "responseSchema", schema,
                         "maxOutputTokens", 128));
 
-        JsonNode response = restClient.post()
-                .uri("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", model)
-                .header("x-goog-api-key", apiKey)
-                .body(request)
-                .retrieve()
-                .body(JsonNode.class);
+        JsonNode response = gerar(request);
         String json = response == null ? "" : response.path("candidates").path(0)
                 .path("content").path("parts").path(0).path("text").asText("");
         if (json.isBlank()) throw new BusinessRuleException("Não consegui interpretar a mensagem. Tente informar valor e descrição.");
@@ -76,5 +84,26 @@ public class GeminiService {
         } catch (RuntimeException e) {
             throw new BusinessRuleException("Não consegui interpretar a mensagem. Tente informar valor e descrição.");
         }
+    }
+
+    private JsonNode gerar(Map<String, Object> request) {
+        RuntimeException ultimaFalha = null;
+        for (String modelo : modelos) {
+            try {
+                return restClient.post()
+                        .uri("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", modelo)
+                        .header("x-goog-api-key", apiKey)
+                        .body(request)
+                        .retrieve()
+                        .body(JsonNode.class);
+            } catch (RestClientResponseException e) {
+                if (!FALHAS_TEMPORARIAS.contains(e.getStatusCode().value())) throw e;
+                ultimaFalha = e;
+            } catch (ResourceAccessException e) {
+                ultimaFalha = e;
+            }
+        }
+        if (ultimaFalha == null) throw new BusinessRuleException("A integração com Gemini ainda não está configurada.");
+        throw ultimaFalha;
     }
 }
