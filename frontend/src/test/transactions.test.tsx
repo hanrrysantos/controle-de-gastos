@@ -43,6 +43,31 @@ describe('new transaction', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Lançamento salvo.')
   })
 
+  it('keeps the draft and selects the new category after creating one', async () => {
+    const lista = [...categorias]
+    const { calls } = mockApi({
+      'GET /categorias': () => ({ body: lista }),
+      'POST /categorias': (call) => {
+        const nova = { id: 9, ...(call.body as { nome: string; tipo: 'DESPESA' }), quantidadeLancamentos: 0 }
+        lista.push(nova)
+        return { status: 201, body: nova }
+      },
+    })
+    const { user } = renderApp('/novo')
+
+    await user.type(screen.getByLabelText('Valor em reais'), '4590')
+    await user.type(screen.getByLabelText('Descrição'), 'Ração')
+    await user.click(await screen.findByRole('link', { name: 'Nova' }))
+    await user.type(await screen.findByLabelText('Nome da categoria'), 'Pets')
+    await user.click(screen.getByRole('button', { name: 'Salvar categoria' }))
+
+    expect(await screen.findByRole('radio', { name: 'Pets' })).toBeChecked()
+    expect(screen.getByRole('heading', { name: 'Novo lançamento' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Valor em reais')).toHaveValue('45,90')
+    expect(screen.getByLabelText('Descrição')).toHaveValue('Ração')
+    expect(calls.find((call) => call.method === 'POST')).toMatchObject({ body: { nome: 'Pets', tipo: 'DESPESA' } })
+  })
+
   it('switching to receita shows only income categories', async () => {
     mockApi({ 'GET /categorias': { body: categorias } })
     const { user } = renderApp('/novo')
