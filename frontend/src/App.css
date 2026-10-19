@@ -283,10 +283,10 @@
 .move-grid { margin: -8px 0 20px; }
 .move-grid .category-tile { box-shadow: none; border-color: var(--border); }
 .move-grid .category-tile.selected { border-color: var(--accent); }
-.toast { position: fixed; z-index: 50; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(350px, calc(100% - 32px)); padding: 14px 18px; border-radius: 16px; color: #fff; background: var(--text); box-shadow: 0 10px 25px #17172033; font-size: 13px; font-weight: 500; text-align: center; animation: toast-enter .22s ease-out; }
+.toast { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); pointer-events: none; width: min(350px, calc(100% - 32px)); padding: 14px 18px; border-radius: 16px; color: #fff; background: var(--text); box-shadow: 0 10px 25px #17172033; font-size: 13px; font-weight: 500; text-align: center; animation: toast-enter .22s ease-out; }
 
 @keyframes page-enter { from { opacity: .6; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toast-enter { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toast-enter { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes chart-enter { from { opacity: .5; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 @keyframes bubble-enter { from { opacity: 0; transform: translate(-50%, -50%) scale(.6); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes sheet-enter { from { transform: translateY(40px); opacity: .4; } to { transform: translateY(0); opacity: 1; } }
