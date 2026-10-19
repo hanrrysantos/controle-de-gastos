@@ -673,6 +673,8 @@ export function CategoriesPage() {
   )
 }
 
+const authBars = [42, 68, 36, 84, 56, 100, 72]
+
 export function AuthPage({ mode, onLogin, notify }: { mode: 'login' | 'register'; onLogin: (session: Sessao) => void; notify: (message: string) => void }) {
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -706,7 +708,13 @@ export function AuthPage({ mode, onLogin, notify }: { mode: 'login' | 'register'
 
   return (
     <div className="app-shell auth-shell">
-      <header className="auth-hero"><span className="brand">cdg.</span><h1>{isLogin ? 'Suas finanças,\nmais claras.' : 'Comece a cuidar\ndo seu dinheiro.'}</h1></header>
+      <header className="auth-hero"><span className="brand">cdg.</span><h1>{isLogin ? 'Suas finanças,\nmais claras.' : 'Comece a cuidar\ndo seu dinheiro.'}</h1>
+        <div className="auth-hero-card" aria-hidden="true">
+          <span>Saldo do mês</span>
+          <strong>R$ 3.240,00</strong>
+          <div>{authBars.map((height, index) => <i key={index} style={{ height: height + '%' }} />)}</div>
+        </div>
+      </header>
       <main className="page-content auth-content">
         <h2>{isLogin ? 'Entre na sua conta' : 'Crie sua conta'}</h2>
         <p>{isLogin ? 'Acompanhe seus lançamentos.' : 'Organize receitas e despesas em um só lugar.'}</p>
@@ -721,6 +729,11 @@ export function AuthPage({ mode, onLogin, notify }: { mode: 'login' | 'register'
       </main>
     </div>
   )
+}
+
+const nameSuggestions: Record<Tipo, string[]> = {
+  DESPESA: ['Mercado', 'Moradia', 'Transporte', 'Lazer', 'Saúde', 'Educação'],
+  RECEITA: ['Salário', 'Freelance', 'Investimentos', 'Renda extra'],
 }
 
 export function CategoryFormPage() {
@@ -750,21 +763,36 @@ export function CategoryFormPage() {
     }
   }
 
+  const preview = name.trim() || (type === 'DESPESA' ? 'Nova despesa' : 'Nova receita')
+  const { Icon: PreviewIcon, color: previewColor } = categoryStyle(preview)
+
   return (
     <div className="page-content">
-      <Link className="back-link" to="/categorias">‹ Categorias</Link>
-      <ScreenTop context="Organização" title="Nova categoria" />
-      <p className="page-subtitle">Dê um nome e escolha como usar.</p>
+      <header className="form-header">
+        <button className="round-button" type="button" onClick={() => navigate(-1)} aria-label="Voltar"><ChevronLeft size={19} /></button>
+        <h1>Nova categoria</h1>
+        <Link className="round-button" to="/categorias" aria-label="Cancelar"><X size={18} /></Link>
+      </header>
+      <section className={'category-preview ' + type.toLowerCase()} aria-label="Prévia da categoria">
+        <span className="category-preview-icon" style={{ '--category': previewColor } as CSSProperties}><PreviewIcon size={30} aria-hidden="true" /></span>
+        <strong>{preview}</strong>
+        <span className="category-preview-type">{type === 'DESPESA' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />} {type === 'DESPESA' ? 'Despesa' : 'Receita'}</span>
+      </section>
       <form className="form-stack" onSubmit={submit}>
-        <label className="field"><span>Nome da categoria</span><div><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Saúde" maxLength={100} required /><Tag size={18} /></div></label>
         <fieldset className="category-choice"><legend>Tipo da categoria</legend>
-          {(['DESPESA', 'RECEITA'] as const).map((value) => <label className={type === value ? 'choice selected' : 'choice'} key={value}>
+          {(['DESPESA', 'RECEITA'] as const).map((value) => <label className={'choice ' + value.toLowerCase() + (type === value ? ' selected' : '')} key={value}>
             <input type="radio" name="tipo" checked={type === value} onChange={() => setType(value)} />
             <span className="choice-icon">{value === 'DESPESA' ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}</span>
             <span><strong>{value === 'DESPESA' ? 'Despesa' : 'Receita'}</strong><small>{value === 'DESPESA' ? 'Para gastos e pagamentos' : 'Para dinheiro que entra'}</small></span>
             <CircleCheck className="choice-check" size={21} />
           </label>)}
         </fieldset>
+        <label className="field"><span>Nome da categoria</span><div><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Saúde" maxLength={100} required /><Tag size={18} /></div></label>
+        <div className="name-suggestions" role="group" aria-label="Sugestões de nome">
+          {nameSuggestions[type].map((suggestion) => <button type="button" key={suggestion} className={name.trim() === suggestion ? 'selected' : ''} onClick={() => setName(suggestion)}>
+            <CategoryIcon name={suggestion} />{suggestion}
+          </button>)}
+        </div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button" type="submit" disabled={busy}><Check size={18} /> {busy ? 'Salvando...' : 'Salvar categoria'}</button>
       </form>
