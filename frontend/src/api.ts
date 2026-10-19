@@ -1,12 +1,13 @@
 export type Tipo = 'RECEITA' | 'DESPESA'
 
 export type Sessao = { token: string; nome: string }
-export type Categoria = { id: number; nome: string; tipo: Tipo }
+export type Categoria = { id: number; nome: string; tipo: Tipo; quantidadeLancamentos: number }
 export type Transacao = {
   id: number
   valor: string
   descricao: string
   data: string
+  categoriaId: number
   nomeCategoria: string
   tipo: Tipo
 }
