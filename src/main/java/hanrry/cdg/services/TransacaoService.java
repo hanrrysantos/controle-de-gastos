@@ -156,7 +156,8 @@ public class TransacaoService {
                 .map(categoria -> {
                     TotalPorCategoria total = totais.get(categoria.getId());
                     return new ResumoMensalResponseDTO.Categoria(categoria.getId(), categoria.getNome(), categoria.getTipo(),
-                            centavos(total == null ? BigDecimal.ZERO : total.total()), total == null ? 0 : total.quantidade());
+                            centavos(total == null ? BigDecimal.ZERO : total.total()), total == null ? 0 : total.quantidade(),
+                            categoria.getMetaMensal());
                 })
                 .sorted(Comparator.comparing(ResumoMensalResponseDTO.Categoria::total).reversed()
                         .thenComparing(ResumoMensalResponseDTO.Categoria::nome, String.CASE_INSENSITIVE_ORDER))

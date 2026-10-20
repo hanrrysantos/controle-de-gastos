@@ -22,5 +22,6 @@ public record ResumoMensalResponseDTO(
             String nome,
             TipoTransacao tipo,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal total,
-            long quantidade) {}
+            long quantidade,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal metaMensal) {}
 }

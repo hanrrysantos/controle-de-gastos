@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,6 +100,38 @@ class CategoriaServiceTest {
 
         assertEquals("Não é possível mudar o tipo de uma categoria que já tem lançamentos.", erro.getMessage());
         assertEquals(TipoTransacao.DESPESA, categoria.getTipo());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void defineERemoveMetaMensalDeDespesa() {
+        Categoria categoria = categoria(1L, "Mercado", TipoTransacao.DESPESA);
+        when(repository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(categoria));
+
+        CategoriaResponseDTO resposta = service.atualizar(1L, dto("Mercado", TipoTransacao.DESPESA, "800"));
+        assertEquals("800.00", resposta.getMetaMensal().toPlainString());
+        assertEquals("800.00", categoria.getMetaMensal().toPlainString());
+
+        service.atualizar(1L, dto("Mercado", TipoTransacao.DESPESA, null));
+        assertEquals(null, categoria.getMetaMensal());
+    }
+
+    @Test
+    void criaCategoriaComMetaMensal() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(usuario));
+
+        CategoriaResponseDTO resposta = service.criar(dto("Lazer", TipoTransacao.DESPESA, "150.5"));
+
+        assertEquals("150.50", resposta.getMetaMensal().toPlainString());
+    }
+
+    @Test
+    void recusaMetaInvalidaOuEmReceita() {
+        assertEquals("Metas mensais só podem ser definidas para categorias de despesa.",
+                assertThrows(BusinessRuleException.class, () -> service.criar(dto("Salário", TipoTransacao.RECEITA, "100"))).getMessage());
+        assertThrows(BusinessRuleException.class, () -> service.criar(dto("Lazer", TipoTransacao.DESPESA, "0")));
+        assertThrows(BusinessRuleException.class, () -> service.criar(dto("Lazer", TipoTransacao.DESPESA, "-10")));
+        assertThrows(BusinessRuleException.class, () -> service.criar(dto("Lazer", TipoTransacao.DESPESA, "10.001")));
         verify(repository, never()).save(any());
     }
 
@@ -196,9 +229,14 @@ class CategoriaServiceTest {
     }
 
     private static CategoriaCreateDTO dto(String nome, TipoTransacao tipo) {
+        return dto(nome, tipo, null);
+    }
+
+    private static CategoriaCreateDTO dto(String nome, TipoTransacao tipo, String metaMensal) {
         CategoriaCreateDTO dto = new CategoriaCreateDTO();
         dto.setNome(nome);
         dto.setTipo(tipo);
+        dto.setMetaMensal(metaMensal == null ? null : new BigDecimal(metaMensal));
         return dto;
     }
 

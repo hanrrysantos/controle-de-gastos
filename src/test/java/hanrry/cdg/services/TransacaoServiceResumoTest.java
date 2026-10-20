@@ -53,6 +53,7 @@ class TransacaoServiceResumoTest {
                 new TotalPorCategoria(2L, new BigDecimal("200.00"), 1L)));
         when(categoriaRepository.findByUserId(7L)).thenReturn(List.of(
                 categoria(1L, "Mercado"), categoria(2L, "Aluguel"), categoria(3L, "Saúde")));
+        categoriaRepository.findByUserId(7L).get(0).setMetaMensal(new BigDecimal("400.00"));
 
         ResumoMensalResponseDTO resumo = service.getResumoMensal("2026-10");
 
@@ -65,6 +66,8 @@ class TransacaoServiceResumoTest {
         assertEquals(List.of("Aluguel", "Mercado", "Saúde"), resumo.categorias().stream().map(ResumoMensalResponseDTO.Categoria::nome).toList());
         assertEquals("0.00", resumo.categorias().get(2).total().toPlainString());
         assertEquals(0, resumo.categorias().get(2).quantidade());
+        assertEquals("400.00", resumo.categorias().get(1).metaMensal().toPlainString());
+        assertEquals(null, resumo.categorias().get(0).metaMensal());
     }
 
     @Test
