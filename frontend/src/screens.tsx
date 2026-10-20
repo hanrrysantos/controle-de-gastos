@@ -353,7 +353,6 @@ function SpendingDonut({ categories, month }: { categories: ResumoCategoria[]; m
   const top = spending.slice(0, 4).map((item) => ({ name: item.nome, amount: cents(item.total), color: categoryStyle(item.nome).color }))
   const rest = spending.slice(4).reduce((sum, item) => sum + cents(item.total), 0n)
   const slices = rest > 0n ? [...top, { name: 'Outras', amount: rest, color: '#a3a3ac' }] : top
-  const gap = slices.length > 1 ? 1.2 : 0
   const arcs = slices.map((slice, index) => ({
     ...slice,
     size: share(slice.amount, total),
@@ -367,8 +366,9 @@ function SpendingDonut({ categories, month }: { categories: ResumoCategoria[]; m
         <div className="donut">
           <svg viewBox="0 0 120 120" aria-hidden="true">
             <circle cx="60" cy="60" r="50" pathLength={100} className="donut-track" />
-            {arcs.map((arc) => <circle key={arc.name} cx="60" cy="60" r="50" pathLength={100} stroke={arc.color}
-              strokeDasharray={`${Math.max(arc.size - gap, 0.5)} ${100 - Math.max(arc.size - gap, 0.5)}`} strokeDashoffset={-arc.offset} />)}
+            {/* Each slice runs to the end of the ring and the next one is drawn on top, so no seam shows between colors. */}
+            {arcs.map((arc, index) => <circle key={arc.name} cx="60" cy="60" r="50" pathLength={100} stroke={arc.color}
+              strokeDasharray={index === 0 ? undefined : `${100 - arc.offset} 100`} strokeDashoffset={-arc.offset} />)}
           </svg>
           <div className="donut-center"><strong>{compactMoney(total)}</strong><span>total gasto</span></div>
         </div>
