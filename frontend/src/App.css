@@ -299,3 +299,24 @@
   .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .telegram-button span { display: none; }
 }
+
+.goal-field > span small { color: var(--text-3); font-size: 11px; }
+.goal-field .form-note { margin: 0; }
+.field-prefix { color: var(--text-2); font-size: 14px; font-weight: 600; }
+.goals-card { display: flex; flex-direction: column; gap: 16px; }
+.goals-card .empty-note .inline-link { display: inline-block; margin-top: 4px; }
+.goal-list { display: flex; flex-direction: column; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.goal-list li { display: flex; align-items: center; gap: 12px; }
+.goal-list li > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.goal-list p { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-size: 13px; }
+.goal-list p span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.goal-list p strong { flex: 0 0 auto; font-size: 13px; font-weight: 600; }
+.goal-list p small { color: var(--text-2); font-weight: 400; }
+.goal-list .progress { margin-top: 0; }
+.goal-progress i { background: var(--income); transition: width .3s ease; }
+.goal-progress.near i { background: var(--accent); }
+.goal-progress.over i { background: var(--expense); }
+.goal-status { display: flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 11px; }
+.goal-status.near { color: var(--accent); }
+.goal-status.over { color: var(--expense); font-weight: 500; }
+.category-card .goal-status { margin-top: -6px; }

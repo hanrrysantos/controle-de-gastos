@@ -1,7 +1,7 @@
 export type Tipo = 'RECEITA' | 'DESPESA'
 
 export type Sessao = { token: string; nome: string }
-export type Categoria = { id: number; nome: string; tipo: Tipo; quantidadeLancamentos: number }
+export type Categoria = { id: number; nome: string; tipo: Tipo; quantidadeLancamentos: number; metaMensal?: string | null }
 export type Transacao = {
   id: number
   valor: string
@@ -12,7 +12,7 @@ export type Transacao = {
   tipo: Tipo
 }
 export type Resumo = { totalReceitas: string; totalDespesas: string; saldo: string }
-export type ResumoCategoria = { id: number; nome: string; tipo: Tipo; total: string; quantidade: number }
+export type ResumoCategoria = { id: number; nome: string; tipo: Tipo; total: string; quantidade: number; metaMensal?: string | null }
 export type ResumoMensal = {
   mes: string
   totalReceitas: string
