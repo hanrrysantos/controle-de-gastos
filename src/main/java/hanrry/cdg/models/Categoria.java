@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,6 +19,8 @@ public class Categoria implements Serializable {
     private String nome;
     @Enumerated(EnumType.STRING)
     private TipoTransacao tipo;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal metaMensal;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -52,6 +55,14 @@ public class Categoria implements Serializable {
 
     public void setTipo(TipoTransacao tipo) {
         this.tipo = tipo;
+    }
+
+    public BigDecimal getMetaMensal() {
+        return metaMensal;
+    }
+
+    public void setMetaMensal(BigDecimal metaMensal) {
+        this.metaMensal = metaMensal;
     }
 
     public User getUser() {

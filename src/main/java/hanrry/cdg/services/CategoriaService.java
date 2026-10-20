@@ -6,6 +6,7 @@ import hanrry.cdg.exceptions.BusinessRuleException;
 import hanrry.cdg.exceptions.ResourceNotFoundException;
 import hanrry.cdg.mappers.CategoriaMapper;
 import hanrry.cdg.models.Categoria;
+import hanrry.cdg.models.TipoTransacao;
 import hanrry.cdg.models.User;
 import hanrry.cdg.repositories.CategoriaRepository;
 import hanrry.cdg.repositories.QuantidadePorCategoria;
@@ -16,6 +17,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -76,6 +79,7 @@ public class CategoriaService {
 
         categoria.setNome(dto.getNome());
         categoria.setTipo(dto.getTipo());
+        categoria.setMetaMensal(dto.getMetaMensal());
         Categoria salva = repository.save(categoria);
         return mapper.toDto(salva, quantidade);
     }
@@ -112,6 +116,15 @@ public class CategoriaService {
         if (dto.getNome() == null || dto.getNome().isBlank() || dto.getTipo() == null) {
             throw new BusinessRuleException("Preencha nome e tipo da categoria.");
         }
+        BigDecimal meta = dto.getMetaMensal();
+        if (meta == null) return;
+        if (dto.getTipo() != TipoTransacao.DESPESA) {
+            throw new BusinessRuleException("Metas mensais só podem ser definidas para categorias de despesa.");
+        }
+        if (meta.signum() <= 0 || meta.stripTrailingZeros().scale() > 2 || meta.precision() - meta.scale() > 17) {
+            throw new BusinessRuleException("A meta mensal deve ser positiva, ter no máximo duas casas decimais e caber no limite monetário.");
+        }
+        dto.setMetaMensal(meta.setScale(2, RoundingMode.UNNECESSARY));
     }
 
     private Categoria buscarDoUsuario(Long id) {

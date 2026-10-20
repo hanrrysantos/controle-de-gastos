@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchP
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, BriefcaseBusiness, Calendar, Car, Check, ChevronLeft, ChevronRight,
   CircleCheck, Copy, ExternalLink, Eye, EyeOff, Gamepad2, GraduationCap, HeartPulse, House, LogOut, Mail,
-  PencilLine, PiggyBank, Plus, Send, Tag, Trash2, UserRound, Utensils, X, type LucideIcon,
+  PencilLine, PiggyBank, Plus, Send, Tag, Target, Trash2, UserRound, Utensils, X, type LucideIcon,
 } from 'lucide-react'
 import { api, ApiError, type Categoria, type ResumoCategoria, type ResumoMensal, type Sessao, type Tipo, type Transacao, type VinculoTelegram } from './api'
 import type { ScreenContext } from './App'
@@ -382,6 +382,36 @@ function SpendingDonut({ categories, month }: { categories: ResumoCategoria[]; m
   )
 }
 
+// Below 80% of the goal is on track; from there it turns orange, and red once the goal is exceeded.
+function goalStatus(spent: bigint, goal: bigint) {
+  const percent = share(spent, goal)
+  return { percent, tone: spent > goal ? 'over' : percent >= 80 ? 'near' : 'ok' }
+}
+
+function GoalsCard({ categories }: { categories: ResumoCategoria[] }) {
+  const goals = categories
+    .filter((item) => item.tipo === 'DESPESA' && item.metaMensal)
+    .map((item) => ({ ...item, spent: cents(item.total), goal: cents(item.metaMensal!), ...goalStatus(cents(item.total), cents(item.metaMensal!)) }))
+    .sort((a, b) => b.percent - a.percent)
+
+  return (
+    <section className="card goals-card" aria-labelledby="goals-title">
+      <div className="section-heading"><h2 id="goals-title">Metas do mês</h2>{goals.length > 0 && <Link to="/categorias">Gerenciar <ArrowRight size={14} /></Link>}</div>
+      {!goals.length ? <p className="empty-note">Defina um limite mensal nas suas categorias de despesa para acompanhar aqui. <Link className="inline-link" to="/categorias">Criar meta</Link></p> : <ul className="goal-list">
+        {goals.map((item) => <li key={item.id}>
+          <CategoryIcon name={item.nome} />
+          <div>
+            <p><span>{item.nome}</span><strong>{moneyFromCents(item.spent)} <small>de {moneyFromCents(item.goal)}</small></strong></p>
+            <span className={'progress goal-progress ' + item.tone} role="img" aria-label={item.percent.toLocaleString('pt-BR') + '% da meta'}><i style={{ width: Math.min(100, item.percent) + '%' }} /></span>
+            <small className={'goal-status ' + item.tone}>{item.tone === 'over' ? 'Passou ' + moneyFromCents(item.spent - item.goal) + ' da meta'
+              : 'Restam ' + moneyFromCents(item.goal - item.spent) + (item.tone === 'near' ? ' · perto do limite' : '')}</small>
+          </div>
+        </li>)}
+      </ul>}
+    </section>
+  )
+}
+
 export function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const { session } = useScreen()
   const [month, setMonth] = useState(currentMonth)
@@ -430,6 +460,7 @@ export function DashboardPage({ onLogout }: { onLogout: () => void }) {
         </section>
         {transactions.items && <FlowChart transactions={transactions.items} />}
         {data && <SpendingDonut categories={data.categorias} month={month} />}
+        {data && <GoalsCard categories={data.categorias} />}
         <section className="recent-section">
           <div className="section-heading"><h2>Últimos lançamentos</h2><Link to="/extrato">Ver todos <ArrowRight size={14} /></Link></div>
           {!transactions.items ? <p className="loading">Carregando lançamentos...</p> : transactions.items.length
@@ -695,11 +726,15 @@ export function CategoriesPage() {
         <div className="category-cards">
           {group.map((item) => {
             const total = cents(item.total)
+            const goal = item.tipo === 'DESPESA' && item.metaMensal ? { amount: cents(item.metaMensal), ...goalStatus(total, cents(item.metaMensal)) } : null
             return <Link className="card category-card" key={item.id} to={'/categorias/' + item.id + '/editar'}>
               <CategoryIcon name={item.nome} size="lg" />
               <div><h3>{item.nome}</h3><span>{item.quantidade ? item.quantidade + (item.quantidade === 1 ? ' lançamento' : ' lançamentos') : 'Sem lançamentos'}</span></div>
               <strong className={total ? '' : 'muted'}>{money(item.total)}</strong>
-              <span className="progress" aria-label={share(total, groupTotal).toLocaleString('pt-BR') + '% do total'}><i style={{ width: share(total, groupTotal) + '%', background: categoryStyle(item.nome).color }} /></span>
+              {goal ? <>
+                <span className={'progress goal-progress ' + goal.tone} role="img" aria-label={goal.percent.toLocaleString('pt-BR') + '% da meta'}><i style={{ width: Math.min(100, goal.percent) + '%' }} /></span>
+                <small className={'goal-status ' + goal.tone}><Target size={12} aria-hidden="true" /> Meta {money(decimalFromCents(goal.amount))}</small>
+              </> : <span className="progress" aria-label={share(total, groupTotal).toLocaleString('pt-BR') + '% do total'}><i style={{ width: share(total, groupTotal) + '%', background: categoryStyle(item.nome).color }} /></span>}
             </Link>
           })}
           <Link className="category-card add" to="/categorias/nova"><span><Plus size={18} /></span>Nova categoria</Link>
@@ -783,6 +818,7 @@ export function CategoryFormPage() {
   const [loadError, setLoadError] = useState('')
   const [name, setName] = useState('')
   const [type, setType] = useState<Tipo>(searchParams.get('tipo') === 'RECEITA' ? 'RECEITA' : 'DESPESA')
+  const [goalDigits, setGoalDigits] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -805,6 +841,7 @@ export function CategoryFormPage() {
         setCategories(result)
         setName(category.nome)
         setType(category.tipo)
+        setGoalDigits(category.metaMensal ? cents(category.metaMensal).toString() : '')
       })
       .catch((err: unknown) => { if (active) requestError(err, onUnauthorized, setLoadError) })
     return () => { active = false }
@@ -824,7 +861,7 @@ export function CategoryFormPage() {
     setBusy(true)
     setError('')
     try {
-      const saved = await api<Categoria>(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type }) }, session.token)
+      const saved = await api<Categoria>(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: JSON.stringify({ nome: name.trim(), tipo: type, metaMensal: type === 'DESPESA' && goalDigits ? decimalFromCents(BigInt(goalDigits)) : null }) }, session.token)
       notify(id ? 'Categoria atualizada.' : 'Categoria criada.')
       if (retorno) navigate(retorno.voltarPara, { replace: true, state: { rascunho: { ...retorno.rascunho, type: saved.tipo, categoryId: String(saved.id) } } })
       else navigate('/categorias')
@@ -889,6 +926,14 @@ export function CategoryFormPage() {
               <CategoryIcon name={suggestion} />{suggestion}
             </button>)}
           </div>
+          {type === 'DESPESA' && <label className="field goal-field"><span>Meta mensal <small>(opcional)</small></span>
+            <div><span className="field-prefix">R$</span><input value={goalDigits ? moneyFromCents(BigInt(goalDigits)).replace('R$ ', '') : ''}
+              onChange={(event) => setGoalDigits(event.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 19))}
+              onFocus={(event) => event.currentTarget.setSelectionRange(event.currentTarget.value.length, event.currentTarget.value.length)}
+              inputMode="numeric" placeholder="0,00" aria-label="Meta mensal em reais" aria-describedby="goal-help" />
+              {goalDigits ? <button className="field-icon-button" type="button" onClick={() => setGoalDigits('')} aria-label="Remover meta"><X size={18} /></button> : <Target size={18} />}</div>
+            <small id="goal-help" className="form-note">Acompanhe na Visão geral quanto do limite já foi gasto no mês.</small>
+          </label>}
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="primary-button" type="submit" disabled={busy}><Check size={18} /> {busy ? 'Salvando...' : id ? 'Salvar alterações' : 'Salvar categoria'}</button>
           {current && <button className="danger-outline" type="button" onClick={() => { setDeleteError(''); setTarget(''); setDeleting(true) }} disabled={busy}><Trash2 size={17} /> Excluir categoria</button>}

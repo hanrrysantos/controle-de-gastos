@@ -22,6 +22,7 @@ O sistema garante a segurança dos dados através de autenticação via Token e 
 - 🔒 **Autenticação Segura:** Login e Cadastro de usuários com JWT (JSON Web Token).
 - 💸 **Gestão de Transações:** Lançamento de Receitas e Despesas com data e descrição.
 - 🏷️ **Categorias Personalizadas:** O usuário cria suas próprias categorias (ex: Alimentação, Lazer, Salário).
+- 🎯 **Metas por Categoria:** Categorias de despesa podem ter um limite mensal, acompanhado na Visão geral.
 - 📊 **Dashboard Dinâmico:** Cálculo automático de saldo, total de entradas e saídas.
 - 🤖 **Registro pelo Telegram:** Mensagens de texto são interpretadas, confirmadas no chat e aparecem no dashboard.
 - 📄 **Extrato Detalhado:** Histórico visual de lançamentos com indicadores de cor (Verde/Vermelho).
@@ -142,8 +143,8 @@ Documentação das rotas disponíveis na API REST.
 | `PUT` | `/transacoes/{id}` | Edita valor, descrição, data e categoria de um lançamento |
 | `DELETE` | `/transacoes/{id}` | Remove um lançamento |
 | `GET` | `/categorias` | Lista as categorias cadastradas pelo usuário, com a quantidade de lançamentos de cada uma |
-| `POST` | `/categorias` | Cria uma categoria |
-| `PUT` | `/categorias/{id}` | Renomeia uma categoria; o tipo só muda se ela não tiver lançamentos |
+| `POST` | `/categorias` | Cria uma categoria; `metaMensal` (opcional, só para despesas) define o limite de gastos do mês |
+| `PUT` | `/categorias/{id}` | Renomeia uma categoria e altera ou remove (`null`) a meta mensal; o tipo só muda se ela não tiver lançamentos |
 | `DELETE` | `/categorias/{id}?moverPara={id}` | Exclui uma categoria; se ela tiver lançamentos, `moverPara` indica outra categoria do mesmo tipo para recebê-los |
 
 ---
