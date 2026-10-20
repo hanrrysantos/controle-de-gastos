@@ -17,7 +17,7 @@ public class AuthorizationService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        hanrry.cdg.models.User user = repository.findByEmail(username)
+        hanrry.cdg.models.User user = repository.findByEmail(UserService.normalizarEmail(username))
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
         return org.springframework.security.core.userdetails.User
