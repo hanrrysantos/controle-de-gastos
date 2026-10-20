@@ -36,6 +36,16 @@ class AuthorizationServiceTest {
     }
 
     @Test
+    void aceitaLoginComEmailEmMaiusculasEEspacos() {
+        User user = new User();
+        user.setEmail("ana@cdg.com");
+        user.setSenha("hash-da-senha");
+        when(repository.findByEmail("ana@cdg.com")).thenReturn(Optional.of(user));
+
+        assertEquals("ana@cdg.com", service.loadUserByUsername(" Ana@CDG.com ").getUsername());
+    }
+
+    @Test
     void lancaExcecaoParaEmailDesconhecido() {
         when(repository.findByEmail("x@cdg.com")).thenReturn(Optional.empty());
 

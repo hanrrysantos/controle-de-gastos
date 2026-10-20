@@ -10,6 +10,8 @@ import hanrry.cdg.repositories.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Service
 public class UserService {
 
@@ -28,6 +30,8 @@ public class UserService {
                 || dto.getSenha() == null || dto.getSenha().isBlank()) {
             throw new BusinessRuleException("Preencha nome, e-mail e senha.");
         }
+        dto.setNome(dto.getNome().trim());
+        dto.setEmail(normalizarEmail(dto.getEmail()));
         if (repository.findByEmail(dto.getEmail()).isPresent()) {
             throw new BusinessRuleException("Este e-mail já está em uso.");
         }
@@ -43,8 +47,13 @@ public class UserService {
     }
 
     public UserResponseDTO buscarPorEmail(String email) {
-        return repository.findByEmail(email)
+        return repository.findByEmail(normalizarEmail(email))
                 .map(mapper::toDto)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado."));
+    }
+
+    // "Ana@CDG.com " e "ana@cdg.com" são o mesmo e-mail: cadastro e login sempre comparam a forma normalizada.
+    public static String normalizarEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

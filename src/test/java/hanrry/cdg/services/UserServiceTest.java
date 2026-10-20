@@ -55,6 +55,27 @@ class UserServiceTest {
     }
 
     @Test
+    void normalizaOEmailAntesDeVerificarECadastrar() {
+        when(repository.findByEmail("ana@cdg.com")).thenReturn(Optional.empty());
+
+        UserResponseDTO resposta = service.cadastrar(registro("  Ana  ", "  Ana@CDG.com ", "segredo123"));
+
+        ArgumentCaptor<User> salvo = ArgumentCaptor.forClass(User.class);
+        verify(repository).save(salvo.capture());
+        assertEquals("ana@cdg.com", salvo.getValue().getEmail());
+        assertEquals("Ana", salvo.getValue().getNome());
+        assertEquals("ana@cdg.com", resposta.getEmail());
+    }
+
+    @Test
+    void recusaCadastroComEmailJaEmUsoEmOutraGrafia() {
+        when(repository.findByEmail("ana@cdg.com")).thenReturn(Optional.of(new User()));
+
+        assertThrows(BusinessRuleException.class, () -> service.cadastrar(registro("Ana", "ANA@cdg.com", "segredo123")));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void recusaCadastroComEmailJaEmUso() {
         when(repository.findByEmail("ana@cdg.com")).thenReturn(Optional.of(new User()));
 
